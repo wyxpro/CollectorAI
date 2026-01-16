@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Search, 
   Tag, 
@@ -15,19 +15,25 @@ import {
   Maximize2,
   Download,
   Sparkles,
-  Zap
+  Zap,
+  X,
+  QrCode,
+  Link as LinkIcon,
+  // Added BrainCircuit to resolve missing reference errors
+  BrainCircuit
 } from 'lucide-react';
 import { KnowledgeCard } from '../types';
 
 const KnowledgeBase: React.FC = () => {
   const [viewMode, setViewMode] = useState<'gallery' | 'grid'>('gallery');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [shareCard, setShareCard] = useState<KnowledgeCard | null>(null);
 
   const sampleCards: KnowledgeCard[] = [
     {
       id: '1',
       originalContent: "Scaling Law 的本质并不是工程参数的堆砌，而是将‘能源’转化为‘逻辑熵’的物理过程。",
-      reflection: "这意味着 AI 的竞争终局可能是能源成本的竞争。对于个人而言，这意味着我们应该更关注‘提问的质量’而非‘计算的速度’，因为逻辑序的产出成本正在急剧下降。",
+      reflection: "这意味着 AI 的竞争终局可能是能源成本的竞争。对于个人而言，这意味着 we 应该更关注‘提问的质量’而非‘计算的速度’，因为逻辑序的产出成本正在急剧下降。",
       tags: ['AI 哲学', '物理学'],
       createdAt: '2024-03-20',
       articleTitle: 'Scaling Law 与智能终局',
@@ -62,7 +68,7 @@ const KnowledgeBase: React.FC = () => {
   const handlePrev = () => setActiveIndex((prev) => (prev - 1 + sampleCards.length) % sampleCards.length);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 md:p-10 h-full flex flex-col">
+    <div className="max-w-7xl mx-auto p-6 md:p-10 h-full flex flex-col relative">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 shrink-0">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">知识博弈库</h1>
@@ -95,7 +101,6 @@ const KnowledgeBase: React.FC = () => {
               
               if (!isVisible) return null;
 
-              // Use correct typing for pointerEvents to satisfy React.CSSProperties
               const pointerEvents: 'auto' | 'none' = isCenter ? 'auto' : 'none';
 
               return (
@@ -103,6 +108,7 @@ const KnowledgeBase: React.FC = () => {
                   key={card.id} 
                   card={card} 
                   theme={themes[idx % themes.length]}
+                  onShare={() => setShareCard(card)}
                   style={{
                     transform: `translateX(${offset * 105}%) scale(${isCenter ? 1 : 0.85}) rotate(${offset * 5}deg)`,
                     opacity: isCenter ? 1 : 0.4,
@@ -134,7 +140,12 @@ const KnowledgeBase: React.FC = () => {
              <div key={card.id} className="bg-white border border-slate-200 rounded-[32px] p-6 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group">
                 <div className="flex justify-between items-start mb-6">
                    <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg tracking-widest">{card.articleTitle}</span>
-                   <MoreHorizontal size={16} className="text-slate-300" />
+                   <div className="flex gap-2">
+                     <button onClick={() => setShareCard(card)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors">
+                       <Share2 size={16} />
+                     </button>
+                     <MoreHorizontal size={16} className="text-slate-300" />
+                   </div>
                 </div>
                 <p className="text-slate-800 font-bold mb-8 leading-relaxed line-clamp-3">"{card.originalContent}"</p>
                 <div className="flex flex-wrap gap-2">
@@ -144,18 +155,111 @@ const KnowledgeBase: React.FC = () => {
            ))}
         </div>
       )}
+
+      {/* Share Poster Modal */}
+      {shareCard && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="absolute top-8 right-8">
+            <button 
+              onClick={() => setShareCard(null)}
+              className="w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div className="flex flex-col items-center gap-8 max-w-full">
+            {/* The Poster Image UI */}
+            <div id="share-poster" className="bg-white w-[380px] rounded-[48px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+              <div className={`h-40 bg-gradient-to-br ${themes[sampleCards.indexOf(shareCard) % themes.length]} p-10 text-white relative`}>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+                <div className="relative z-10 flex flex-col justify-end h-full">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BrainCircuit size={16} className="text-white/60" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Read AI 思维切片</span>
+                  </div>
+                  <h3 className="text-xl font-black leading-tight line-clamp-2">{shareCard.articleTitle}</h3>
+                </div>
+              </div>
+              
+              <div className="p-10 space-y-8">
+                <div className="relative">
+                  <span className="text-6xl text-slate-100 font-serif absolute -top-8 -left-4 select-none">“</span>
+                  <p className="text-xl font-black text-slate-900 leading-relaxed relative z-10">
+                    {shareCard.originalContent}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 rounded-[32px] p-6 border border-slate-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap size={14} className="text-indigo-600" fill="currentColor" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">AI 深度复盘</span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-600 leading-relaxed italic">
+                    {shareCard.reflection}
+                  </p>
+                </div>
+
+                <div className="flex items-end justify-between pt-4 border-t border-slate-100">
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {shareCard.tags.map(t => (
+                        <span key={t} className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest">#{t}</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+                        <BrainCircuit size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-900 leading-none">Read AI</p>
+                        <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">Gamified Mastery</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-2">
+                    <div className="p-2 bg-white border-2 border-slate-50 rounded-2xl shadow-sm">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://readai.app/share/${shareCard.id}&bgcolor=ffffff&color=4f46e5`} 
+                        alt="Article QR" 
+                        className="w-16 h-16"
+                      />
+                    </div>
+                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">扫码探索全文</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button 
+                onClick={() => {
+                  alert('海报已优化，请直接长按图片保存或截图分享。');
+                }}
+                className="bg-white text-black px-10 py-5 rounded-[24px] font-black flex items-center gap-3 shadow-xl active:scale-95 transition-all"
+              >
+                <Download size={20} /> 保存图片
+              </button>
+              <button className="bg-white/10 text-white px-8 py-5 rounded-[24px] font-black hover:bg-white/20 transition-all flex items-center gap-2">
+                <Share2 size={18} /> 分享链接
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Define InteractiveCard as a React.FC to handle standard props like 'key' correctly
 interface InteractiveCardProps {
   card: KnowledgeCard;
   theme: string;
   style: React.CSSProperties;
+  onShare: () => void;
 }
 
-const InteractiveCard: React.FC<InteractiveCardProps> = ({ card, theme, style }) => {
+const InteractiveCard: React.FC<InteractiveCardProps> = ({ card, theme, style, onShare }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   return (
@@ -177,7 +281,7 @@ const InteractiveCard: React.FC<InteractiveCardProps> = ({ card, theme, style })
                  </div>
                  <span className="text-xs font-black uppercase tracking-[0.2em]">{card.articleTitle}</span>
               </div>
-              <Share2 size={20} className="text-white/60" />
+              <Share2 size={20} className="text-white/60 hover:text-white transition-colors" />
            </div>
 
            <div className="flex-1 flex flex-col justify-center relative z-10">
@@ -208,7 +312,7 @@ const InteractiveCard: React.FC<InteractiveCardProps> = ({ card, theme, style })
               </div>
               <div>
                 <span className="block text-[10px] font-black uppercase text-indigo-600 tracking-widest">AI 思维沉淀</span>
-                <span className="block text-[10px] font-bold text-slate-400">GENERATED BY GEMINI 2.0</span>
+                <span className="block text-[10px] font-bold text-slate-400">GENERATED BY GEMINI 3</span>
               </div>
            </div>
 
@@ -226,8 +330,15 @@ const InteractiveCard: React.FC<InteractiveCardProps> = ({ card, theme, style })
                     <span className="text-[10px] font-black">{card.createdAt}</span>
                  </div>
                  <div className="flex gap-2">
-                    <button className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all" title="保存为图片">
-                       <Download size={18} />
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onShare();
+                      }}
+                      className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all" 
+                      title="生成分享海报"
+                    >
+                       <QrCode size={18} />
                     </button>
                     <button className="p-3 bg-indigo-600 text-white hover:bg-indigo-700 rounded-2xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 px-6">
                        <Maximize2 size={18} />

@@ -19,17 +19,23 @@ import {
   RotateCcw,
   Search,
   AlertCircle,
-  // Added Sparkles to resolve missing reference errors
-  Sparkles
+  Sparkles,
+  CreditCard,
+  Crown
 } from 'lucide-react';
 
-const SettingsView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'personal' | 'insights' | 'help'>('profile');
+interface SettingsViewProps {
+  onUpgrade: () => void;
+}
+
+const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription' | 'personal' | 'insights' | 'help'>('profile');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
   const menuItems = [
     { id: 'profile', label: '个人资料', icon: <User size={18} /> },
     { id: 'security', label: '账户安全', icon: <ShieldCheck size={18} /> },
+    { id: 'subscription', label: '订阅计划', icon: <CreditCard size={18} /> },
     { id: 'personal', label: '个性化设置', icon: <Palette size={18} /> },
     { id: 'insights', label: '收藏与清理', icon: <Heart size={18} /> },
     { id: 'help', label: '帮助中心', icon: <HelpCircle size={18} /> },
@@ -41,6 +47,8 @@ const SettingsView: React.FC = () => {
         return <ProfileSection />;
       case 'security':
         return <SecuritySection />;
+      case 'subscription':
+        return <SubscriptionSection onUpgrade={onUpgrade} />;
       case 'personal':
         return <PersonalizationSection theme={theme} setTheme={setTheme} />;
       case 'insights':
@@ -60,7 +68,7 @@ const SettingsView: React.FC = () => {
       </header>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* 左侧导航 */}
+        {/* Navigation */}
         <aside className="w-full lg:w-64 shrink-0">
           <div className="bg-white border border-slate-200 rounded-[32px] p-2 sticky top-24">
             {menuItems.map((item) => (
@@ -80,7 +88,7 @@ const SettingsView: React.FC = () => {
           </div>
         </aside>
 
-        {/* 右侧内容区 */}
+        {/* Content Area */}
         <div className="flex-1 bg-white border border-slate-200 rounded-[40px] p-8 md:p-12 shadow-sm min-h-[600px]">
           {renderContent()}
         </div>
@@ -89,7 +97,7 @@ const SettingsView: React.FC = () => {
   );
 };
 
-/* --- 子组件：个人资料 --- */
+/* --- Profile Section --- */
 const ProfileSection = () => (
   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
     <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-slate-100">
@@ -142,7 +150,7 @@ const ProfileSection = () => (
   </div>
 );
 
-/* --- 子组件：账户安全 --- */
+/* --- Security Section --- */
 const SecuritySection = () => (
   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
     <h3 className="text-xl font-bold text-slate-900 mb-6">安全概览</h3>
@@ -196,7 +204,66 @@ const SecurityItem = ({ icon, label, status, action }: any) => (
   </div>
 );
 
-/* --- 子组件：个性化设置 --- */
+/* --- Subscription Section --- */
+const SubscriptionSection = ({ onUpgrade }: { onUpgrade: () => void }) => (
+  <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+    <h3 className="text-xl font-bold text-slate-900 mb-6">我的订阅</h3>
+    
+    <div className="p-8 rounded-[40px] bg-gradient-to-br from-slate-900 to-indigo-900 text-white relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none"></div>
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
+            当前计划
+          </div>
+          <h4 className="text-4xl font-black tracking-tight">Read AI 免费版</h4>
+          <p className="text-indigo-200/70 text-sm font-medium">体验 AI 阅读的魅力，升级以解锁更多特权。</p>
+          <div className="pt-4 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold">
+               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+               每日 3 篇 AI 网页解析剩余
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold">
+               <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+               限制导出 PDF 等高阶功能
+            </div>
+          </div>
+        </div>
+        <button 
+          onClick={onUpgrade}
+          className="bg-amber-400 hover:bg-amber-300 text-slate-900 px-10 py-5 rounded-[28px] font-black text-sm shadow-xl shadow-amber-900/40 transition-all active:scale-95 flex items-center gap-2 shrink-0 self-start md:self-center"
+        >
+          <Crown size={20} /> 立即升级到 PRO
+        </button>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <div className="p-6 border border-slate-100 rounded-3xl space-y-4">
+          <h5 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-widest">
+            <Database size={16} className="text-indigo-600" /> 存储额度
+          </h5>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-400">
+              <span>1.2 GB / 5 GB 已使用</span>
+              <span>24%</span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-indigo-500 w-[24%]" />
+            </div>
+          </div>
+       </div>
+       <div className="p-6 border border-slate-100 rounded-3xl space-y-4">
+          <h5 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-widest">
+            <Bell size={16} className="text-amber-600" /> 续费提醒
+          </h5>
+          <p className="text-xs text-slate-400 font-medium">您当前处于免费模式，订阅 PRO 后可在此管理自动续费开关。</p>
+       </div>
+    </div>
+  </div>
+);
+
+/* --- Personalization Section --- */
 const PersonalizationSection = ({ theme, setTheme }: any) => (
   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
     <div className="space-y-6">
@@ -243,7 +310,7 @@ const ToggleItem = ({ label, active }: any) => (
   </div>
 );
 
-/* --- 子组件：收藏与清理 --- */
+/* --- Insights Section --- */
 const InsightsManagementSection = () => {
   const [subTab, setSubTab] = useState<'kept' | 'discarded'>('kept');
 
@@ -294,7 +361,7 @@ const InsightsManagementSection = () => {
   );
 };
 
-/* --- 子组件：帮助中心 --- */
+/* --- Help Section --- */
 const HelpSection = () => (
   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
     <div className="bg-indigo-600 rounded-[32px] p-8 text-white relative overflow-hidden">

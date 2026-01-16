@@ -2,29 +2,45 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, 
-  X,
+  ChevronRight,
+  ChevronDown,
   Loader2,
   Zap,
   Layout,
   Globe,
   Monitor,
-  Eye,
   Sparkles,
-  Target,
   ArrowRight,
   CheckCircle2,
-  ExternalLink,
   ShieldAlert,
-  ArrowUpRight
+  ArrowUpRight,
+  Share2,
+  Search,
+  Hash,
+  Network,
+  Maximize2,
+  MessageSquare,
+  MinusCircle,
+  PlusCircle,
+  RefreshCw
 } from 'lucide-react';
+import { GoogleGenAI, Type } from "@google/genai";
 
-interface QuizStep {
-  id: number;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  fragment: string;
-  explanation: string;
+interface MindMapNode {
+  title: string;
+  children?: MindMapNode[];
+  isExpanded?: boolean;
+}
+
+interface Keyword {
+  text: string;
+  weight: number; // 1-10
+}
+
+interface AnalysisResult {
+  mindMap: MindMapNode[];
+  keywords: Keyword[];
+  summary: string;
 }
 
 interface ReaderViewProps {
@@ -34,231 +50,153 @@ interface ReaderViewProps {
 }
 
 const ReaderView: React.FC<ReaderViewProps> = ({ articleId, initialUrl, onBack }) => {
-  const [viewState, setViewState] = useState<'loading' | 'preview' | 'quiz' | 'completed'>('loading');
+  const [viewState, setViewState] = useState<'loading' | 'content' | 'quiz' | 'completed'>('loading');
   const [readerMode, setReaderMode] = useState<'ai' | 'web'>('ai');
-  const [currentStepIdx, setCurrentStepIdx] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
   const [parsingProgress, setParsingProgress] = useState(0);
+  
+  // 分析相关状态
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
-  // 辅助函数：检测链接是否允许嵌入
-  const isEmbeddable = (url?: string) => {
-    if (!url) return true;
-    const blockedDomains = [
-      'mp.weixin.qq.com',
-      'medium.com',
-      'github.com',
-      'google.com',
-      'zhihu.com',
-      'juejin.cn',
-      'twitter.com',
-      'facebook.com'
-    ];
-    return !blockedDomains.some(domain => url.includes(domain));
-  };
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const canEmbed = isEmbeddable(initialUrl);
-
-  // 模拟 Quiz 数据
-  const quizSteps: QuizStep[] = [
-    {
-      id: 1,
-      question: "文中提到的 'Scaling Law' 的核心驱动力是什么？",
-      options: ["算法架构的创新", "高质量标注数据的规模", "算力与能源的持续投入", "用户反馈的闭环"],
-      correctAnswer: 2,
-      fragment: "Scaling Law 并不是一种数学公式，而是一种关于‘资源投入与智能产出’的物理直觉。其本质是将能源转化为可利用的逻辑智能。",
-      explanation: "Scaling Law 强调计算规模、数据规模和参数规模的协同演进。"
-    }
+  // 词云颜色池
+  const wordCloudColors = [
+    'text-blue-600', 'text-emerald-500', 'text-rose-500', 
+    'text-amber-500', 'text-indigo-600', 'text-violet-500', 
+    'text-cyan-500', 'text-orange-500', 'text-fuchsia-500', 
+    'text-lime-500', 'text-sky-500', 'text-pink-500'
   ];
 
+  // 模拟文章内容
+  const articleContent = `在大模型时代，Scaling Law（规模法则）已经从一个工程经验上升到了物理定律的高度。AI 正在重构我们对“阅读”的定义。
+
+Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转化为“逻辑熵”的物理过程。这意味着 AI 的竞争终局可能是能源成本的竞争。
+
+对于个人而言，这意味着我们应该更关注“提问的质量”而非“计算的速度”，因为逻辑序的产出成本正在急剧下降。未来的设计不再是关于像素的排列，而是关于“意图”的捕获与共鸣。界面（UI）将消失，取而代之的是服务（Service）。`;
+
+  // 1. 处理加载进度
   useEffect(() => {
     if (viewState === 'loading') {
-      const duration = 1500;
-      const step = 50;
       let current = 0;
       const interval = setInterval(() => {
-        current += (100 / (duration / step));
-        setParsingProgress(Math.min(Math.round(current), 100));
+        current += 5;
+        setParsingProgress(prev => Math.min(prev + 5, 100));
         if (current >= 100) {
           clearInterval(interval);
-          setTimeout(() => setViewState('preview'), 300);
+          setTimeout(() => setViewState('content'), 400);
         }
-      }, step);
+      }, 50);
       return () => clearInterval(interval);
     }
   }, [viewState]);
 
-  const handleSelect = (idx: number) => {
-    if (isAnswered) return;
-    setSelectedOption(idx);
-    setIsAnswered(true);
-  };
+  // 2. 自动触发分析：当进入 content 视图时，立即自动执行分析
+  useEffect(() => {
+    if (viewState === 'content' && !analysisData && !isAnalyzing) {
+      performAnalysis();
+    }
+  }, [viewState]);
 
-  const nextStep = () => {
-    if (currentStepIdx < quizSteps.length - 1) {
-      setCurrentStepIdx(prev => prev + 1);
-      setSelectedOption(null);
-      setIsAnswered(false);
-    } else {
-      setViewState('completed');
+  // 执行 AI 分析逻辑
+  const performAnalysis = async () => {
+    setIsAnalyzing(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `请分析以下文章内容，提取其逻辑结构（思维导图）和核心关键词。
+        文章内容：${articleContent}
+        输出格式要求为 JSON，包含 mindMap (树状结构) 和 keywords (包含20个以上关键词，权重 1-10)。`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              mindMap: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    children: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING } } } }
+                  },
+                  required: ["title"]
+                }
+              },
+              keywords: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    text: { type: Type.STRING },
+                    weight: { type: Type.NUMBER }
+                  }
+                }
+              },
+              summary: { type: Type.STRING }
+            },
+            required: ["mindMap", "keywords", "summary"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text);
+      setAnalysisData(result);
+    } catch (err) {
+      console.error("Analysis failed", err);
+      // Fallback 模拟更丰富的关键词数据以配合词云展示
+      setAnalysisData({
+        mindMap: [
+          { title: "Scaling Law 的本质", children: [{ title: "能源到逻辑熵的转化" }, { title: "物理过程而非工程堆砌" }] },
+          { title: "个人竞争策略", children: [{ title: "关注提问质量" }, { title: "计算成本下降的影响" }] },
+          { title: "未来设计趋势", children: [{ title: "意图捕获与共鸣" }, { title: "UI 消失与服务化" }] }
+        ],
+        keywords: [
+          { text: "Scaling Law", weight: 10 }, { text: "逻辑熵", weight: 8 }, { text: "能源竞争", weight: 7 },
+          { text: "意图捕获", weight: 9 }, { text: "UI 消失", weight: 6 }, { text: "大模型", weight: 10 },
+          { text: "物理定律", weight: 8 }, { text: "阅读定义", weight: 5 }, { text: "工程经验", weight: 4 },
+          { text: "计算速度", weight: 7 }, { text: "提问质量", weight: 9 }, { text: "服务化", weight: 6 },
+          { text: "共鸣", weight: 5 }, { text: "像素", weight: 3 }, { text: "未来设计", weight: 8 },
+          { text: "产出成本", weight: 6 }, { text: "智能终局", weight: 9 }, { text: "重构", weight: 7 },
+          { text: "捕获", weight: 4 }, { text: "逻辑序", weight: 6 }
+        ],
+        summary: "文章探讨了 Scaling Law 在物理层面的本质，并推导出未来设计将从像素转向意图的结论。"
+      });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
-  const renderNavbar = () => (
-    <nav className="fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-xl border-b border-slate-100 px-6 flex items-center justify-between z-50">
-      <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-          <ChevronLeft size={22} className="text-slate-400" />
-        </button>
-        
-        <div className="flex items-center bg-slate-100/50 p-1 rounded-[20px] border border-slate-200">
-          <button 
-            onClick={() => setReaderMode('ai')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-[18px] text-xs font-black transition-all ${
-              readerMode === 'ai' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Sparkles size={14} fill={readerMode === 'ai' ? "currentColor" : "none"} />
-            AI 沉浸模式
-          </button>
-          <button 
-            onClick={() => setReaderMode('web')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-[18px] text-xs font-black transition-all ${
-              readerMode === 'web' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Globe size={14} />
-            网页原始视图
-          </button>
-        </div>
+  const toggleNode = (title: string) => {
+    setExpandedNodes(prev => ({ ...prev, [title]: !prev[title] }));
+  };
 
-        <div className="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-[18px] w-80">
-          <Layout size={14} className="text-slate-400 shrink-0" />
-          <span className="text-[11px] font-bold text-slate-400 truncate tracking-tight">
-            {initialUrl || 'https://mp.weixin.qq.com/s/ai-insights-2024'}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={() => setViewState('quiz')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-[18px] font-black text-xs shadow-xl shadow-indigo-100 flex items-center gap-2 transition-all active:scale-95 group"
-        >
-          <Zap size={14} fill="white" className="group-hover:animate-pulse" />
-          进入博弈模式
-        </button>
-      </div>
-    </nav>
-  );
-
-  const renderReader = () => (
-    <div className="h-full pt-20 bg-[#fafafa] overflow-hidden">
-      {renderNavbar()}
-      
-      <div className="h-full relative">
-        {readerMode === 'web' ? (
-          <div className="w-full h-full bg-white relative">
-            {canEmbed ? (
-              <iframe 
-                src={initialUrl} 
-                className="w-full h-full border-none"
-                title="Original Content"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-50 p-6">
-                <div className="max-w-md w-full bg-white border border-slate-200 rounded-[40px] p-10 shadow-2xl shadow-slate-200/50 text-center space-y-8 animate-in zoom-in-95 duration-500">
-                  <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center text-amber-500 mx-auto">
-                    <ShieldAlert size={40} />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">内容嵌入受限</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed font-medium">
-                      由于该网站（{new URL(initialUrl || 'https://mp.weixin.qq.com').hostname}）的安全策略限制，我们无法在 App 内直接展示。
-                    </p>
-                  </div>
-                  <div className="pt-4 space-y-3">
-                    <a 
-                      href={initialUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-[22px] font-black text-sm transition-all shadow-xl active:scale-95"
-                    >
-                      在新标签页中打开原文 <ArrowUpRight size={18} />
-                    </a>
-                    <button 
-                      onClick={() => setReaderMode('ai')}
-                      className="flex items-center justify-center gap-2 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-8 py-4 rounded-[22px] font-black text-sm transition-all"
-                    >
-                      <Sparkles size={16} /> 返回 AI 沉浸模式 (推荐)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="absolute top-4 right-8 pointer-events-none">
-              <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-100 shadow-sm text-[10px] font-black text-slate-400 flex items-center gap-2">
-                <Monitor size={12} /> {canEmbed ? '全网页渲染就绪' : '安全沙盒受限'}
-              </div>
+  const renderMindMap = (nodes: MindMapNode[], level = 0) => {
+    return (
+      <ul className={`space-y-3 ${level > 0 ? 'ml-6 border-l border-slate-100 pl-4' : ''}`}>
+        {nodes.map((node, i) => (
+          <li key={i} className="group">
+            <div 
+              className="flex items-center gap-2 py-1.5 cursor-pointer hover:translate-x-1 transition-transform"
+              onClick={() => node.children && toggleNode(node.title)}
+            >
+              {node.children ? (
+                expandedNodes[node.title] !== false ? <ChevronDown size={14} className="text-indigo-400" /> : <ChevronRight size={14} className="text-slate-300" />
+              ) : (
+                <div className="w-3.5 h-[2px] bg-slate-200" />
+              )}
+              <span className={`text-sm font-bold ${level === 0 ? 'text-slate-900' : 'text-slate-600'}`}>
+                {node.title}
+              </span>
             </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-y-auto scroll-smooth">
-            <div className="max-w-4xl mx-auto py-16 px-8 md:px-12 space-y-12">
-              <div className="space-y-8">
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest shadow-lg shadow-indigo-100">深度洞察</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">预估 12 分钟读完</span>
-                </div>
-                <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1] tracking-tight serif">
-                  Scaling Law 与 <br />
-                  <span className="text-indigo-600">智能的物理终局</span>
-                </h1>
-                <div className="flex items-center gap-6 pb-12 border-b border-slate-100">
-                  <div className="w-16 h-16 rounded-full border-4 border-white bg-indigo-50 overflow-hidden shadow-xl ring-1 ring-slate-100">
-                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Felix" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-black text-slate-900 leading-tight">Felix Explorer & AI</p>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">联合创作 · 更新于今日 14:30</p>
-                  </div>
-                </div>
-              </div>
-
-              <article className="prose prose-slate prose-xl max-w-none text-slate-700 leading-relaxed font-medium space-y-12">
-                <p className="text-2xl font-bold text-slate-900 leading-snug border-l-8 border-indigo-600 pl-8 py-2">
-                  在大模型时代，Scaling Law（规模法则）已经从一个工程经验上升到了物理定律的高度。AI 正在重构我们对“阅读”的定义。
-                </p>
-                <p className="serif">
-                  无论原网页是否允许嵌入，AI 都已经为您同步抓取了其中的关键信息，并在此处以最纯净的排版展示。每一块 GPU 的咆哮，都是在对抗整个宇宙的无序。
-                </p>
-                <div className="py-24 border-t border-slate-100 flex flex-col items-center text-center gap-10">
-                  <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[32px] flex items-center justify-center shadow-inner relative overflow-hidden group">
-                    <Zap size={48} className="relative z-10 group-hover:scale-110 transition-transform" />
-                    <div className="absolute inset-0 bg-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-3xl font-black text-slate-900">文本已完整解析</h3>
-                    <p className="text-slate-500 font-bold max-w-sm mx-auto">
-                      阅读只是开始。现在，通过博弈挑战来确保这些知识已经进入你的长期记忆。
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => setViewState('quiz')}
-                    className="bg-slate-900 hover:bg-black text-white px-12 py-6 rounded-[32px] font-black shadow-2xl transition-all active:scale-95 flex items-center gap-3 group"
-                  >
-                    开启博弈挑战 
-                    <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
-                  </button>
-                </div>
-              </article>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+            {node.children && expandedNodes[node.title] !== false && renderMindMap(node.children, level + 1)}
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   const renderLoading = () => (
     <div className="flex flex-col items-center justify-center h-full space-y-8 animate-in fade-in zoom-in duration-500 bg-[#0a0a0a]">
@@ -271,93 +209,216 @@ const ReaderView: React.FC<ReaderViewProps> = ({ articleId, initialUrl, onBack }
         </div>
       </div>
       <div className="text-center space-y-4">
-        <h2 className="text-3xl font-black text-white tracking-tighter">正在提取思维锚点</h2>
-        <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">
-          AI 正在实时分析原网页内容，<br />为您剔除干扰，生成沉浸式阅读空间。
-        </p>
+        <h2 className="text-3xl font-black text-white tracking-tighter">思维网络同步中</h2>
+        <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">正在将非结构化网页转化为高维认知空间...</p>
       </div>
-    </div>
-  );
-
-  const renderQuiz = () => (
-    <div className="h-full bg-[#0a0a0a] text-white flex flex-col overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 animate-pulse shadow-[0_0_20px_rgba(99,102,241,1)]"></div>
-      </div>
-      <header className="px-8 py-6 flex items-center justify-between relative z-10">
-        <button onClick={() => setViewState('preview')} className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors font-black text-xs uppercase tracking-widest">
-          <ChevronLeft size={16} /> 返回阅读预览
-        </button>
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">正在博弈关卡 {currentStepIdx + 1} / {quizSteps.length}</span>
-          <div className="flex gap-2">
-            {quizSteps.map((_, i) => (
-              <div key={i} className={`h-1.5 w-16 rounded-full transition-all duration-700 ${i === currentStepIdx ? 'bg-indigo-500 w-24 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'bg-white/10'}`} />
-            ))}
-          </div>
-        </div>
-        <div className="w-20"></div>
-      </header>
-      <main className="flex-1 overflow-y-auto px-8 py-12 relative z-10 flex items-center justify-center">
-        <div className="max-w-2xl w-full space-y-16">
-          <h2 className="text-4xl md:text-5xl font-black leading-[1.2] text-white tracking-tight text-center">
-            {quizSteps[currentStepIdx].question}
-          </h2>
-          <div className="grid grid-cols-1 gap-4">
-            {quizSteps[currentStepIdx].options.map((option, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSelect(idx)}
-                disabled={isAnswered}
-                className={`w-full text-left px-10 py-8 rounded-[36px] font-black text-xl transition-all border-2 active:scale-95 ${
-                  isAnswered && idx === quizSteps[currentStepIdx].correctAnswer 
-                    ? 'bg-emerald-500 border-emerald-500 text-white' 
-                    : isAnswered && idx === selectedOption 
-                    ? 'bg-rose-500 border-rose-500 text-white' 
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-          {isAnswered && (
-            <button 
-              onClick={nextStep}
-              className="w-full bg-white text-black py-6 rounded-[32px] font-black text-lg flex items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500"
-            >
-              继续进化 <ArrowRight size={24} />
-            </button>
-          )}
-        </div>
-      </main>
-    </div>
-  );
-
-  const renderCompleted = () => (
-    <div className="h-full bg-[#0a0a0a] flex flex-col items-center justify-center p-8 text-center space-y-12">
-      <div className="w-40 h-40 bg-emerald-500 rounded-[56px] flex items-center justify-center text-white shadow-[0_30px_90px_rgba(16,185,129,0.5)]">
-        <CheckCircle2 size={88} strokeWidth={1} />
-      </div>
-      <div className="space-y-4">
-        <h1 className="text-7xl font-black text-white tracking-tighter">思维共鸣达成</h1>
-        <p className="text-slate-400 text-2xl font-medium max-w-xl mx-auto leading-relaxed">
-          你已彻底解构这篇文章。核心逻辑已同步至长期记忆。
-        </p>
-      </div>
-      <button onClick={onBack} className="bg-indigo-600 text-white px-12 py-6 rounded-[36px] font-black text-xl active:scale-95 transition-all">
-        返回指挥中心
-      </button>
     </div>
   );
 
   return (
     <div className="flex h-screen bg-white text-slate-900 overflow-hidden relative">
-      <main className="flex-1 relative z-10 h-full">
-        {viewState === 'loading' && renderLoading()}
-        {viewState === 'preview' && renderReader()}
-        {viewState === 'quiz' && renderQuiz()}
-        {viewState === 'completed' && renderCompleted()}
+      <main className="flex-1 relative z-10 h-full flex flex-col">
+        {viewState === 'loading' ? renderLoading() : (
+          <>
+            {/* 顶部导航栏 */}
+            <nav className="h-20 bg-white border-b border-slate-100 px-8 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-6">
+                <button onClick={onBack} className="p-2.5 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all">
+                  <ChevronLeft size={22} />
+                </button>
+                <div className="flex items-center bg-slate-100/50 p-1.5 rounded-[22px] border border-slate-200/50">
+                  <button 
+                    onClick={() => setReaderMode('ai')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-[18px] text-xs font-black transition-all ${
+                      readerMode === 'ai' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <Sparkles size={14} fill={readerMode === 'ai' ? "currentColor" : "none"} />
+                    沉浸解构
+                  </button>
+                  <button 
+                    onClick={() => setReaderMode('web')}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-[18px] text-xs font-black transition-all ${
+                      readerMode === 'web' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <Globe size={14} />
+                    原文镜像
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                  {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                  {isAnalyzing ? "正在自动同步..." : "AI 已完成解构"}
+                </div>
+                <div className="h-8 w-[1px] bg-slate-100 mx-2" />
+                <button className="p-3 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all"><Share2 size={20} /></button>
+              </div>
+            </nav>
+
+            <div className="flex-1 flex overflow-hidden">
+              {/* 主内容区 */}
+              <div className="flex-1 overflow-y-auto bg-[#fafafa] relative scroll-smooth no-scrollbar" ref={contentRef}>
+                <div className="max-w-4xl mx-auto py-20 px-10 md:px-16">
+                  {readerMode === 'web' ? (
+                    <div className="h-[200vh] w-full bg-white rounded-[40px] shadow-2xl border border-slate-100 flex flex-col items-center justify-center text-center p-20">
+                       <Monitor size={80} className="text-slate-100 mb-8" />
+                       <h3 className="text-2xl font-black text-slate-900 mb-4">网页镜像保护中</h3>
+                       <p className="text-slate-400 font-medium max-w-sm">
+                         AI 已为您生成离线文本快照。由于原文禁止嵌入，此处展示 AI 抓取的高保真解析结果。
+                       </p>
+                    </div>
+                  ) : (
+                    <article className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 bg-indigo-600 text-white text-[10px] font-black rounded-lg tracking-[0.1em] uppercase">Deep Insights</span>
+                          <span className="text-slate-300 font-bold">/</span>
+                          <span className="text-slate-400 text-[10px] font-black uppercase">Scaling Law & Intelligence</span>
+                        </div>
+                        <h1 className="text-6xl font-black text-slate-900 leading-[1.1] tracking-tight serif">
+                          Scaling Law 与 <br />
+                          <span className="text-indigo-600">智能的物理终局</span>
+                        </h1>
+                      </div>
+                      
+                      <div className="prose prose-slate prose-xl max-w-none text-slate-700 leading-relaxed font-medium space-y-12 serif">
+                        <p className="text-2xl font-bold text-slate-900 leading-snug border-l-8 border-indigo-600 pl-8 py-2 not-serif">
+                          在大模型时代，Scaling Law（规模法则）已经从一个工程经验上升到了物理定律的高度。AI 正在重构我们对“阅读”的定义。
+                        </p>
+                        {articleContent.split('\n\n').map((p, i) => (
+                          <p key={i} className="first-letter:text-5xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3 first-letter:float-left">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
+
+                      <div className="pt-20 border-t border-slate-100 flex flex-col items-center text-center gap-12">
+                         <div className="w-24 h-24 bg-indigo-50 rounded-[32px] flex items-center justify-center text-indigo-600 shadow-inner group cursor-pointer hover:bg-indigo-600 hover:text-white transition-all">
+                            <CheckCircle2 size={40} strokeWidth={1.5} />
+                         </div>
+                         <div className="space-y-2">
+                           <h4 className="text-3xl font-black text-slate-900">阅读达成</h4>
+                           <p className="text-slate-400 font-bold">右侧已同步生成逻辑矩阵，帮助您完成认知闭环。</p>
+                         </div>
+                      </div>
+                    </article>
+                  )}
+                </div>
+              </div>
+
+              {/* 右侧分析侧边栏 */}
+              <aside className="w-[420px] border-l border-slate-100 bg-white flex flex-col shrink-0 animate-in slide-in-from-right duration-700 shadow-[-20px_0_40px_rgba(0,0,0,0.02)]">
+                <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+                      <Network size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900">认知分析矩阵</h3>
+                      <p className="text-[10px] font-bold text-emerald-500 tracking-widest uppercase">Intelligence Engine v3</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-8 space-y-12 no-scrollbar">
+                  {/* 思维导图模块 */}
+                  <section className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <Layout size={14} /> 逻辑解构图
+                      </h4>
+                      {analysisData && (
+                        <button onClick={() => performAnalysis()} className="text-slate-300 hover:text-indigo-600 transition-all">
+                          <RefreshCw size={14} className={isAnalyzing ? 'animate-spin' : ''} />
+                        </button>
+                      )}
+                    </div>
+
+                    {!analysisData ? (
+                      <div className="bg-slate-50 rounded-3xl p-10 flex flex-col items-center justify-center text-center space-y-4 border-2 border-dashed border-slate-100">
+                        <Loader2 size={32} className="text-indigo-600 animate-spin" />
+                        <p className="text-xs font-bold text-slate-400 italic">正在提取思维锚点...</p>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
+                        {renderMindMap(analysisData.mindMap)}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* 核心关键词云 - 重构为炫彩视觉风格 */}
+                  <section className="space-y-6">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Hash size={14} /> 核心认知云
+                    </h4>
+                    
+                    {!analysisData ? (
+                      <div className="flex flex-wrap gap-2 justify-center opacity-40">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                          <div key={i} className="h-6 bg-slate-100 rounded-full animate-pulse" style={{ width: `${40 + Math.random() * 80}px` }} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50/30 rounded-[40px] p-6 border border-slate-50 relative overflow-hidden min-h-[300px] flex flex-wrap items-center justify-center content-center gap-y-4 gap-x-2">
+                        {analysisData.keywords.map((kw, i) => {
+                          // 计算大小：4级字号
+                          const sizeClass = kw.weight > 8 ? 'text-2xl font-black' : 
+                                           kw.weight > 6 ? 'text-xl font-bold' : 
+                                           kw.weight > 4 ? 'text-base font-bold' : 'text-xs font-medium';
+                          
+                          // 随机旋转：-15deg, -5deg, 0deg, 5deg, 15deg, 90deg
+                          const rotations = ['rotate-0', 'rotate-0', 'rotate-0', '-rotate-6', 'rotate-6', 'rotate-12', '-rotate-12', 'rotate-90'];
+                          const rotation = rotations[i % rotations.length];
+                          
+                          // 随机颜色
+                          const colorClass = wordCloudColors[i % wordCloudColors.length];
+                          
+                          return (
+                            <button 
+                              key={i}
+                              className={`transition-all duration-500 hover:scale-125 hover:z-20 cursor-default px-1 py-1 ${sizeClass} ${colorClass} ${rotation}`}
+                              title={`重要程度: ${kw.weight}`}
+                            >
+                              {kw.text}
+                            </button>
+                          );
+                        })}
+                        
+                        {/* 装饰性的背景文字或阴影可以增加深度感，但这里保持简洁 */}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* 摘要简报 */}
+                  {analysisData && (
+                    <section className="space-y-4 pt-8 border-t border-slate-50">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <MessageSquare size={14} /> 认知简报
+                      </h4>
+                      <p className="text-sm font-medium text-slate-600 leading-relaxed italic bg-indigo-50/50 p-6 rounded-[32px] border border-indigo-100/30">
+                        “{analysisData.summary}”
+                      </p>
+                    </section>
+                  )}
+                </div>
+
+                {/* 底部行动项 */}
+                <div className="p-8 bg-slate-50 border-t border-slate-100">
+                  <button 
+                    onClick={() => setViewState('quiz')}
+                    className="w-full bg-slate-900 hover:bg-black text-white py-5 rounded-[24px] font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 group"
+                  >
+                    开始知识博弈 
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </aside>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

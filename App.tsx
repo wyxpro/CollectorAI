@@ -8,7 +8,9 @@ import {
   Settings, 
   Plus,
   Flame,
-  BarChart3
+  BarChart3,
+  CreditCard,
+  Crown
 } from 'lucide-react';
 import Dashboard from './views/Dashboard';
 import LibraryView from './views/LibraryView';
@@ -16,6 +18,7 @@ import ReaderView from './views/ReaderView';
 import KnowledgeBase from './views/KnowledgeBase';
 import SettingsView from './views/SettingsView';
 import LearningData from './views/LearningData';
+import SubscriptionView from './views/SubscriptionView';
 import { View } from './types';
 
 const App: React.FC = () => {
@@ -48,7 +51,9 @@ const App: React.FC = () => {
       case View.LEARNING_DATA:
         return <LearningData />;
       case View.SETTINGS:
-        return <SettingsView />;
+        return <SettingsView onUpgrade={() => setCurrentView(View.SUBSCRIPTION)} />;
+      case View.SUBSCRIPTION:
+        return <SubscriptionView onBack={() => setCurrentView(View.DASHBOARD)} />;
       default:
         return <Dashboard onStartReading={(id, url) => navigateToReader(id, url)} />;
     }
@@ -93,9 +98,23 @@ const App: React.FC = () => {
               active={currentView === View.KNOWLEDGE} 
               onClick={() => setCurrentView(View.KNOWLEDGE)} 
             />
+            <NavItem 
+              icon={<CreditCard size={22} />} 
+              label="付费订阅" 
+              active={currentView === View.SUBSCRIPTION} 
+              onClick={() => setCurrentView(View.SUBSCRIPTION)} 
+            />
           </div>
 
-          <div className="px-4 py-6 border-t border-slate-50">
+          <div className="px-4 py-6 border-t border-slate-50 space-y-4">
+             {/* Upgrade Button in Sidebar */}
+             <button 
+              onClick={() => setCurrentView(View.SUBSCRIPTION)}
+              className="hidden md:flex w-full items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-[20px] text-white shadow-lg shadow-amber-100 hover:scale-[1.02] transition-all group"
+             >
+                <Crown size={20} className="group-hover:rotate-12 transition-transform" />
+                <span className="text-sm font-black">升级到 PRO</span>
+             </button>
             <NavItem 
               icon={<Settings size={22} />} 
               label="个人中心" 

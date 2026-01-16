@@ -5,7 +5,8 @@ export enum View {
   READER = 'reader',
   KNOWLEDGE = 'knowledge',
   LEARNING_DATA = 'learning_data',
-  SETTINGS = 'settings'
+  SETTINGS = 'settings',
+  SUBSCRIPTION = 'subscription'
 }
 
 export interface Article {

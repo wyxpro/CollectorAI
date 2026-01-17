@@ -1,5 +1,6 @@
 
 export enum View {
+  LANDING = 'landing',
   DASHBOARD = 'dashboard',
   LIBRARY = 'library',
   READER = 'reader',

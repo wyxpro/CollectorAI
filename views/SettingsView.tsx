@@ -23,6 +23,7 @@ import {
   Crown
 } from 'lucide-react';
 import { useUserSettings } from '../api/userHooks';
+import { useTheme } from '../hooks/useTheme';
 
 interface SettingsViewProps {
   onUpgrade: () => void;
@@ -33,22 +34,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
   
   // 使用用户设置Hook
   const userId = 'user_demo_123'; // 实际应该从认证系统获取
-  const { settings, updateTheme, updateNotifications } = useUserSettings(userId);
+  const { settings, updateTheme: updateUserTheme, updateNotifications } = useUserSettings(userId);
   
-  // 本地主题状态（用于即时UI反馈）
-  const [localTheme, setLocalTheme] = useState<'light' | 'dark' | 'system'>('light');
-  
-  // 同步远程设置到本地状态
-  useEffect(() => {
-    if (settings) {
-      setLocalTheme(settings.theme);
-    }
-  }, [settings]);
+  // 使用深色模式Hook
+  const { theme, setTheme, resolvedTheme } = useTheme();
   
   // 处理主题切换
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
-    setLocalTheme(newTheme);
-    await updateTheme(newTheme);
+    setTheme(newTheme);
+    await updateUserTheme(newTheme);
   };
 
   const menuItems = [
@@ -75,7 +69,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
       case 'subscription':
         return <SubscriptionSection onUpgrade={onUpgrade} />;
       case 'personal':
-        return <PersonalizationSection theme={localTheme} setTheme={handleThemeChange} updateNotifications={updateNotifications} />;
+        return <PersonalizationSection theme={theme} setTheme={handleThemeChange} updateNotifications={updateNotifications} resolvedTheme={resolvedTheme} />;
       case 'insights':
         return <InsightsManagementSection />;
       case 'help':
@@ -88,22 +82,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
   return (
     <div className="max-w-6xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
       <header className="mb-10">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">个人中心</h1>
-        <p className="text-slate-500">管理您的账户设置、偏好以及阅读数据。</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">个人中心</h1>
+        <p className="text-slate-500 dark:text-slate-400">管理您的账户设置、偏好以及阅读数据。</p>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Navigation */}
         <aside className="w-full lg:w-64 shrink-0">
-          <div className="bg-white border border-slate-200 rounded-[32px] p-2 sticky top-24">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-2 sticky top-24">
             {sortedMenu.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
                 className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${
                   activeTab === item.id 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-[1.02]' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 dark:shadow-indigo-900/50 scale-[1.02]' 
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
                 {item.icon}
@@ -114,7 +108,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
         </aside>
 
         {/* Content Area */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-[40px] p-8 md:p-12 shadow-sm min-h-[600px]">
+        <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[40px] p-8 md:p-12 shadow-sm min-h-[600px]">
           {renderContent()}
         </div>
       </div>
@@ -125,9 +119,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
 /* --- Profile Section --- */
 const ProfileSection = () => (
   <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
-    <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-slate-100">
+    <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-slate-100 dark:border-slate-800">
       <div className="relative group cursor-pointer">
-        <div className="w-32 h-32 rounded-[40px] overflow-hidden border-4 border-white shadow-2xl ring-1 ring-slate-100 transition-transform group-hover:scale-105">
+        <div className="w-32 h-32 rounded-[40px] overflow-hidden border-4 border-white dark:border-slate-800 shadow-2xl ring-1 ring-slate-100 dark:ring-slate-700 transition-transform group-hover:scale-105">
           <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-full h-full object-cover" />
         </div>
         <div className="absolute inset-0 bg-black/40 rounded-[40px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -135,40 +129,40 @@ const ProfileSection = () => (
         </div>
       </div>
       <div className="text-center md:text-left">
-        <h3 className="text-2xl font-bold text-slate-900 mb-1">Felix 探索者</h3>
-        <p className="text-slate-500 text-sm mb-4">加入于 2023年11月 · 博学贤者 LV.4</p>
-        <button className="text-sm font-bold text-indigo-600 bg-indigo-50 px-5 py-2 rounded-xl hover:bg-indigo-100 transition-colors">编辑个人简介</button>
+        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Felix 探索者</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">加入于 2023年11月 · 博学贤者 LV.4</p>
+        <button className="text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-5 py-2 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">编辑个人简介</button>
       </div>
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">用户名</label>
-        <input type="text" defaultValue="felix_reader_01" className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:border-indigo-500" />
+        <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">用户名</label>
+        <input type="text" defaultValue="felix_reader_01" className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-white" />
       </div>
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">个人格言</label>
-        <input type="text" placeholder="在这里写下你的读书信条..." className="w-full px-5 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:border-indigo-500" />
+        <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">个人格言</label>
+        <input type="text" placeholder="在这里写下你的读书信条..." className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
       </div>
     </div>
 
-    <div className="bg-slate-50 rounded-[32px] p-8 border border-slate-100">
+    <div className="bg-slate-50 dark:bg-slate-800 rounded-[32px] p-8 border border-slate-100 dark:border-slate-700">
       <div className="flex items-center gap-3 mb-6">
-        <Database className="text-indigo-600" size={20} />
-        <h4 className="font-bold text-slate-900">数据统计</h4>
+        <Database className="text-indigo-600 dark:text-indigo-400" size={20} />
+        <h4 className="font-bold text-slate-900 dark:text-white">数据统计</h4>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
-          <p className="text-xs text-slate-400 font-medium mb-1">累计阅读时长</p>
-          <p className="text-xl font-bold">128 小时</p>
+        <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-1">累计阅读时长</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white">128 小时</p>
         </div>
-        <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
-          <p className="text-xs text-slate-400 font-medium mb-1">存储空间</p>
-          <p className="text-xl font-bold">1.2 GB / 5 GB</p>
+        <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-1">存储空间</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white">1.2 GB / 5 GB</p>
         </div>
-        <div className="p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
-          <p className="text-xs text-slate-400 font-medium mb-1">本月活跃度</p>
-          <p className="text-xl font-bold">85%</p>
+        <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-1">本月活跃度</p>
+          <p className="text-xl font-bold text-slate-900 dark:text-white">85%</p>
         </div>
       </div>
     </div>
@@ -289,7 +283,7 @@ const SubscriptionSection = ({ onUpgrade }: { onUpgrade: () => void }) => (
 );
 
 /* --- Personalization Section --- */
-const PersonalizationSection = ({ theme, setTheme, updateNotifications }: any) => {
+const PersonalizationSection = ({ theme, setTheme, updateNotifications, resolvedTheme }: any) => {
   const [notificationSettings, setNotificationSettings] = useState({
     dailyChallenge: true,
     knowledgeReview: false,
@@ -304,9 +298,14 @@ const PersonalizationSection = ({ theme, setTheme, updateNotifications }: any) =
   return (
     <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
       <div className="space-y-6">
-        <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Palette size={20} className="text-indigo-600" /> 主题偏好
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Palette size={20} className="text-indigo-600 dark:text-indigo-400" /> 主题偏好
+          </h4>
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+            当前: {resolvedTheme === 'dark' ? '深色' : '浅色'}模式
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-4">
           {['light', 'dark', 'system'].map((t) => (
             <button
@@ -335,11 +334,16 @@ const PersonalizationSection = ({ theme, setTheme, updateNotifications }: any) =
             </button>
           ))}
         </div>
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-2xl p-4">
+          <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+            💡 提示：选择"跟随系统"将根据您的设备设置自动切换主题
+          </p>
+        </div>
       </div>
 
       <div className="space-y-6">
         <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-          <Bell size={20} className="text-indigo-600" /> 通知偏好
+          <Bell size={20} className="text-indigo-600 dark:text-indigo-400" /> 通知偏好
         </h4>
         <div className="space-y-3">
           <ToggleItem 

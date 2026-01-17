@@ -23,10 +23,11 @@ import LearningData from './views/LearningData';
 import PodcastView from './views/PodcastView';
 import AIQuizView from './views/AIQuizView';
 import SubscriptionView from './views/SubscriptionView';
+import LandingPage from './views/LandingPage';
 import { View } from './types';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
+  const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [targetUrl, setTargetUrl] = useState<string>('');
 
@@ -38,6 +39,8 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
+      case View.LANDING:
+        return <LandingPage onStart={() => setCurrentView(View.DASHBOARD)} />;
       case View.DASHBOARD:
         return <Dashboard onStartReading={(id, url) => navigateToReader(id, url)} />;
       case View.LIBRARY:
@@ -67,18 +70,18 @@ const App: React.FC = () => {
     }
   };
 
-  const isReaderView = currentView === View.READER;
+  const isFullPageView = currentView === View.READER || currentView === View.LANDING;
 
   return (
-    <div className={`flex h-screen ${isReaderView ? 'bg-[#0a0a0a]' : 'bg-white'} text-slate-900 overflow-hidden`}>
+    <div className={`flex h-screen ${currentView === View.READER ? 'bg-[#0a0a0a]' : 'bg-white'} text-slate-900 overflow-hidden`}>
       {/* Sidebar Navigation */}
-      {!isReaderView && (
+      {!isFullPageView && (
         <nav className="w-20 md:w-64 bg-white border-r border-slate-100 flex flex-col items-center md:items-stretch py-8 transition-all duration-300 z-50">
           <div className="px-6 mb-12 flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[18px] flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50">
               <BrainCircuit className="text-white w-7 h-7" />
             </div>
-            <span className="hidden md:block text-2xl font-black tracking-tight text-slate-900">Read AI</span>
+            <span className="hidden md:block text-2xl font-black tracking-tight text-slate-900">Collector +</span>
           </div>
 
           <div className="flex-1 space-y-2 px-4 overflow-y-auto">
@@ -140,7 +143,7 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto relative bg-[#f8fafc]/30">
+      <main className={`flex-1 overflow-y-auto relative bg-[#f8fafc]/30 ${currentView === View.LANDING ? 'smooth-scroll' : ''}`}>
         {renderView()}
       </main>
     </div>

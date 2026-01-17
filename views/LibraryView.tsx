@@ -336,7 +336,7 @@ const MindAssistant: React.FC<MindAssistantProps> = ({ articles, onClose }) => {
 
       if (!apiKey) {
         const offline = [
-          "检测到未配置 GEMINI_API_KEY，启用本地离线总结模式。",
+          "",
           "以下是基于已收藏文章的简要洞察：",
           context,
           "",

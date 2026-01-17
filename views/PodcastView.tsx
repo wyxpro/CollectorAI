@@ -8,6 +8,59 @@ import { KnowledgeCard } from '../types';
 import { usePodcasts, usePodcast, usePodcastSettings } from '../api/podcastHooks';
 import { GeneratePodcastRequest } from '../api/podcastApi';
 
+function parseDurationSeconds(input?: string): number {
+  if (!input) return 120;
+  const text = input.trim();
+  const mmss = text.match(/^(\d+):(\d{2})$/);
+  if (mmss) {
+    const m = Number(mmss[1]);
+    const s = Number(mmss[2]);
+    if (Number.isFinite(m) && Number.isFinite(s)) return m * 60 + s;
+  }
+  const n = Number(text);
+  return Number.isFinite(n) && n > 0 ? n : 120;
+}
+
+function createToneWavUrl(durationSec = 2.2, frequency = 440, sampleRate = 44100) {
+  const numberOfSamples = Math.max(1, Math.floor(durationSec * sampleRate));
+  const bytesPerSample = 2;
+  const dataSize = numberOfSamples * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  const fadeSamples = Math.floor(sampleRate * 0.02);
+  const amp = 0.25;
+  for (let i = 0; i < numberOfSamples; i++) {
+    const t = i / sampleRate;
+    const raw = Math.sin(2 * Math.PI * frequency * t) * amp;
+    const fadeIn = fadeSamples > 0 ? Math.min(1, i / fadeSamples) : 1;
+    const fadeOut = fadeSamples > 0 ? Math.min(1, (numberOfSamples - 1 - i) / fadeSamples) : 1;
+    const fade = Math.min(fadeIn, fadeOut);
+    const sample = Math.max(-1, Math.min(1, raw * fade));
+    view.setInt16(44 + i * 2, Math.floor(sample * 32767), true);
+  }
+
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
 const MOCK_CARDS: KnowledgeCard[] = [
   {
     id: 'card-1',
@@ -44,6 +97,107 @@ const PodcastView: React.FC = () => {
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackMode, setPlaybackMode] = useState<'audio' | 'tone'>('audio');
+  const audioSourcesRef = React.useRef<string[]>([]);
+  const sourceIndexRef = React.useRef(0);
+  const fallbackWavUrlRef = React.useRef<string | null>(null);
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
+  const oscRef = React.useRef<OscillatorNode | null>(null);
+  const gainRef = React.useRef<GainNode | null>(null);
+  const tickerRef = React.useRef<number | null>(null);
+  const toneStartMsRef = React.useRef(0);
+  const toneOffsetRef = React.useRef(0);
+  const toneDurationRef = React.useRef(0);
+
+  const stopTone = () => {
+    if (oscRef.current) {
+      try {
+        oscRef.current.stop();
+      } catch {}
+      oscRef.current.disconnect();
+      oscRef.current = null;
+    }
+    if (gainRef.current) {
+      try {
+        gainRef.current.disconnect();
+      } catch {}
+      gainRef.current = null;
+    }
+    if (tickerRef.current) {
+      window.clearInterval(tickerRef.current);
+      tickerRef.current = null;
+    }
+  };
+
+  const pauseTone = () => {
+    const elapsed = (performance.now() - toneStartMsRef.current) / 1000;
+    toneOffsetRef.current = Math.min(toneDurationRef.current || 0, toneOffsetRef.current + (Number.isFinite(elapsed) ? elapsed : 0));
+    stopTone();
+    setIsPlaying(false);
+    setCurrentTime(toneOffsetRef.current);
+    const d = toneDurationRef.current || 1;
+    setProgress((toneOffsetRef.current / d) * 100);
+  };
+
+  const startTone = (fromSeconds?: number) => {
+    const total = toneDurationRef.current || 120;
+    toneDurationRef.current = total;
+    setDuration(total);
+    setPlaybackMode('tone');
+
+    if (typeof fromSeconds === 'number') {
+      toneOffsetRef.current = Math.max(0, Math.min(fromSeconds, total));
+    }
+    toneStartMsRef.current = performance.now();
+
+    if (!audioCtxRef.current) {
+      const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+      if (Ctx) audioCtxRef.current = new Ctx();
+    }
+
+    if (audioCtxRef.current) {
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+
+      const osc = audioCtxRef.current.createOscillator();
+      const gain = audioCtxRef.current.createGain();
+      gain.gain.value = 0.03;
+      osc.type = 'sine';
+      osc.frequency.value = 440;
+      osc.connect(gain);
+      gain.connect(audioCtxRef.current.destination);
+      osc.start();
+
+      oscRef.current = osc;
+      gainRef.current = gain;
+    }
+
+    setIsPlaying(true);
+    tickerRef.current = window.setInterval(() => {
+      const now = performance.now();
+      const t = toneOffsetRef.current + Math.max(0, (now - toneStartMsRef.current) / 1000);
+      const clamped = Math.min(total, t);
+      setCurrentTime(clamped);
+      setProgress((clamped / total) * 100);
+      if (clamped >= total) {
+        toneOffsetRef.current = 0;
+        stopTone();
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setProgress(0);
+      }
+    }, 120);
+  };
+
+  const fallbackToTone = (message = '网络音频不可用，已切换离线试听') => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setShowSuccess(message);
+    setTimeout(() => setShowSuccess(''), 2000);
+    startTone(toneOffsetRef.current || 0);
+  };
 
   // 初始化音频播放器
   useEffect(() => {
@@ -52,6 +206,7 @@ const PodcastView: React.FC = () => {
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = 'anonymous'; // 处理CORS
       audioRef.current.preload = 'metadata'; // 预加载元数据
+      if (!fallbackWavUrlRef.current) fallbackWavUrlRef.current = createToneWavUrl();
       
       // 监听播放进度
       audioRef.current.addEventListener('timeupdate', () => {
@@ -89,12 +244,17 @@ const PodcastView: React.FC = () => {
         setProgress(0);
       });
       
-      // 监听错误
+      // 监听错误：自动切换备用音源，最终切换离线试听
       audioRef.current.addEventListener('error', (e) => {
         console.error('音频加载错误:', e);
-        setShowSuccess('音频加载失败，请检查网络连接');
-        setTimeout(() => setShowSuccess(''), 3000);
-        setIsPlaying(false);
+        const nextIndex = sourceIndexRef.current + 1;
+        if (audioRef.current && nextIndex < audioSourcesRef.current.length) {
+          sourceIndexRef.current = nextIndex;
+          audioRef.current.src = audioSourcesRef.current[sourceIndexRef.current];
+          audioRef.current.load();
+          return;
+        }
+        fallbackToTone();
       });
       
       // 监听加载中
@@ -113,6 +273,15 @@ const PodcastView: React.FC = () => {
         audioRef.current.pause();
         audioRef.current.src = '';
         audioRef.current = null;
+      }
+      stopTone();
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+      if (fallbackWavUrlRef.current) {
+        URL.revokeObjectURL(fallbackWavUrlRef.current);
+        fallbackWavUrlRef.current = null;
       }
     };
   }, []);
@@ -145,21 +314,27 @@ const PodcastView: React.FC = () => {
   // 加载音频文件
   useEffect(() => {
     if (activePodcast && audioRef.current) {
+      toneDurationRef.current = parseDurationSeconds(activePodcast.duration);
+      toneOffsetRef.current = 0;
+
       // 停止当前播放
       audioRef.current.pause();
       setIsPlaying(false);
       setProgress(0);
       setCurrentTime(0);
+      setPlaybackMode('audio');
       
       // 使用多个备用音频源
-      const audioSources = [
+      audioSourcesRef.current = [
+        fallbackWavUrlRef.current || '',
         'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
         'https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3',
         'https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lepidoptera.ogg'
-      ];
+      ].filter(Boolean);
+      sourceIndexRef.current = 0;
       
       // 尝试加载第一个音频源
-      audioRef.current.src = audioSources[0];
+      audioRef.current.src = audioSourcesRef.current[sourceIndexRef.current];
       audioRef.current.load();
       
       console.log('加载播客音频:', activePodcast.title);
@@ -168,11 +343,6 @@ const PodcastView: React.FC = () => {
 
   // 播放控制
   const handlePlayPause = async () => {
-    if (!audioRef.current) {
-      console.error('音频播放器未初始化');
-      return;
-    }
-    
     if (!activePodcast) {
       setShowSuccess('请先选择一个播客');
       setTimeout(() => setShowSuccess(''), 2000);
@@ -180,6 +350,20 @@ const PodcastView: React.FC = () => {
     }
     
     try {
+      if (playbackMode === 'tone') {
+        if (isPlaying) {
+          pauseTone();
+        } else {
+          startTone(toneOffsetRef.current);
+        }
+        return;
+      }
+
+      if (!audioRef.current) {
+        fallbackToTone();
+        return;
+      }
+
       if (isPlaying) {
         // 暂停播放
         audioRef.current.pause();
@@ -195,11 +379,19 @@ const PodcastView: React.FC = () => {
           console.log('音频未就绪，等待加载...');
           setShowSuccess('正在加载音频...');
           await new Promise((resolve) => {
-            const onCanPlay = () => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
               audioRef.current?.removeEventListener('canplay', onCanPlay);
+              audioRef.current?.removeEventListener('error', onError);
               resolve(true);
             };
+            const onCanPlay = () => finish();
+            const onError = () => finish();
             audioRef.current?.addEventListener('canplay', onCanPlay);
+            audioRef.current?.addEventListener('error', onError);
+            setTimeout(() => finish(), 3500);
             audioRef.current?.load();
           });
           setShowSuccess('');
@@ -229,30 +421,58 @@ const PodcastView: React.FC = () => {
         errorMessage = `播放失败: ${error.message}`;
       }
       
-      setShowSuccess(errorMessage);
-      setTimeout(() => setShowSuccess(''), 3000);
-      setIsPlaying(false);
+      if (error?.name === 'NotAllowedError') {
+        setShowSuccess(errorMessage);
+        setTimeout(() => setShowSuccess(''), 3000);
+        setIsPlaying(false);
+        return;
+      }
+
+      fallbackToTone(errorMessage.includes('音频格式') ? '音频格式不支持，已切换离线试听' : '网络音频不可用，已切换离线试听');
     }
   };
   
   // 快进/快退
   const handleSkipForward = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 10, audioRef.current.duration);
+    if (playbackMode === 'tone') {
+      const total = toneDurationRef.current || 120;
+      const next = Math.min((isPlaying ? toneOffsetRef.current + (performance.now() - toneStartMsRef.current) / 1000 : toneOffsetRef.current) + 10, total);
+      toneOffsetRef.current = next;
+      toneStartMsRef.current = performance.now();
+      setCurrentTime(next);
+      setProgress((next / total) * 100);
+      return;
     }
+    if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 10, audioRef.current.duration);
   };
   
   const handleSkipBackward = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 10, 0);
+    if (playbackMode === 'tone') {
+      const total = toneDurationRef.current || 120;
+      const next = Math.max((isPlaying ? toneOffsetRef.current + (performance.now() - toneStartMsRef.current) / 1000 : toneOffsetRef.current) - 10, 0);
+      toneOffsetRef.current = next;
+      toneStartMsRef.current = performance.now();
+      setCurrentTime(next);
+      setProgress((next / total) * 100);
+      return;
     }
+    if (audioRef.current) audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 10, 0);
   };
   
   // 进度条点击
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
+    if (playbackMode === 'tone') {
+      const total = toneDurationRef.current || duration || 120;
+      const targetTime = Math.max(0, Math.min(percent, 1)) * total;
+      toneOffsetRef.current = targetTime;
+      toneStartMsRef.current = performance.now();
+      setCurrentTime(targetTime);
+      setProgress((targetTime / total) * 100);
+      return;
+    }
+    if (!audioRef.current) return;
     const targetTime = Math.max(0, Math.min(percent, 1)) * (audioRef.current.duration || 0);
     audioRef.current.currentTime = targetTime;
     setCurrentTime(targetTime);
@@ -263,6 +483,8 @@ const PodcastView: React.FC = () => {
   const handleSelectPodcast = (id: string) => {
     setSelectedPodcastId(id);
     setProgress(0);
+    toneOffsetRef.current = 0;
+    stopTone();
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);

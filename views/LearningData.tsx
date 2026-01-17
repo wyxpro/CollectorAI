@@ -101,7 +101,7 @@ const LearningData: React.FC = () => {
     <div className="max-w-7xl mx-auto p-6 md:p-10 space-y-12 animate-in fade-in duration-700 pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">认知成长报告</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">学习报告</h1>
           <p className="text-slate-500 font-medium text-lg">基于 1,248 分钟的沉浸式数据分析。</p>
         </div>
         <div className="flex gap-3 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
@@ -110,6 +110,14 @@ const LearningData: React.FC = () => {
           <button className="px-6 py-2.5 text-slate-500 hover:text-slate-900 text-sm font-black rounded-xl transition-all">全部数据</button>
         </div>
       </header>
+
+      {/* 核心统计卡片（置于学习报告下方） */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <DataCard icon={<Clock className="text-indigo-600" />} title="本月累计时长" value="1,248" unit="分钟" trend="+12% 较上周" />
+        <DataCard icon={<Activity className="text-emerald-600" />} title="专注指数 P90" value="88.5" unit="分" trend="极高水平" />
+        <DataCard icon={<Zap className="text-amber-600" />} title="博弈挑战胜率" value="94.2" unit="%" trend="顶尖水平" />
+        <DataCard icon={<Flame className="text-orange-600" />} title="连续学习勋章" value="45" unit="天" trend="历史最高" />
+      </div>
 
       {/* 第一行：认知分布与多维评估 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -330,13 +338,7 @@ const LearningData: React.FC = () => {
         </div>
       </section>
 
-      {/* 第三行：核心统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <DataCard icon={<Clock className="text-indigo-600" />} title="本月累计时长" value="1,248" unit="分钟" trend="+12% 较上周" />
-        <DataCard icon={<Activity className="text-emerald-600" />} title="专注指数 P90" value="88.5" unit="分" trend="极高水平" />
-        <DataCard icon={<Zap className="text-amber-600" />} title="博弈挑战胜率" value="94.2" unit="%" trend="顶尖水平" />
-        <DataCard icon={<Flame className="text-orange-600" />} title="连续学习勋章" value="45" unit="天" trend="历史最高" />
-      </div>
+      
 
     </div>
   );

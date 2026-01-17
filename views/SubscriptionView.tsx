@@ -35,7 +35,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ onBack }) => {
       price: '￥29',
       period: '每月',
       description: '适合尝试 AI 深度阅读体验的初期探索者',
-      features: ['无限次 AI 网页解析', '每日 5 场思维博弈任务', '基础知识卡片导出', '标准 AI 播客生成'],
+      features: ['无限次 AI 网页解析', '每日 5 场思维博弈任务', '基础AI 问答导出', '标准 AI 播客生成'],
       highlight: false
     },
     {

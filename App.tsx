@@ -10,7 +10,9 @@ import {
   Flame,
   BarChart3,
   CreditCard,
-  Crown
+  Crown,
+  Headphones,
+  MessageSquare
 } from 'lucide-react';
 import Dashboard from './views/Dashboard';
 import LibraryView from './views/LibraryView';
@@ -18,6 +20,8 @@ import ReaderView from './views/ReaderView';
 import KnowledgeBase from './views/KnowledgeBase';
 import SettingsView from './views/SettingsView';
 import LearningData from './views/LearningData';
+import PodcastView from './views/PodcastView';
+import AIQuizView from './views/AIQuizView';
 import SubscriptionView from './views/SubscriptionView';
 import { View } from './types';
 
@@ -50,6 +54,10 @@ const App: React.FC = () => {
         return <KnowledgeBase />;
       case View.LEARNING_DATA:
         return <LearningData />;
+      case View.PODCAST:
+        return <PodcastView />;
+      case View.AI_QUIZ:
+        return <AIQuizView />;
       case View.SETTINGS:
         return <SettingsView onUpgrade={() => setCurrentView(View.SUBSCRIPTION)} />;
       case View.SUBSCRIPTION:
@@ -82,27 +90,33 @@ const App: React.FC = () => {
             />
             <NavItem 
               icon={<Library size={22} />} 
-              label="知识卡片" 
+              label="收录夹" 
               active={currentView === View.LIBRARY} 
               onClick={() => setCurrentView(View.LIBRARY)} 
+            />
+            <NavItem 
+              icon={<NotebookPen size={22} />} 
+              label="AI 卡片" 
+              active={currentView === View.KNOWLEDGE} 
+              onClick={() => setCurrentView(View.KNOWLEDGE)} 
+            />
+            <NavItem 
+              icon={<Headphones size={22} />} 
+              label="AI 播客" 
+              active={currentView === View.PODCAST} 
+              onClick={() => setCurrentView(View.PODCAST)} 
+            />
+            <NavItem 
+               icon={<MessageSquare size={22} />} 
+              label="AI 问答" 
+              active={currentView === View.AI_QUIZ} 
+              onClick={() => setCurrentView(View.AI_QUIZ)} 
             />
             <NavItem 
               icon={<BarChart3 size={22} />} 
               label="学习数据" 
               active={currentView === View.LEARNING_DATA} 
               onClick={() => setCurrentView(View.LEARNING_DATA)} 
-            />
-            <NavItem 
-              icon={<NotebookPen size={22} />} 
-              label="知识库" 
-              active={currentView === View.KNOWLEDGE} 
-              onClick={() => setCurrentView(View.KNOWLEDGE)} 
-            />
-            <NavItem 
-              icon={<CreditCard size={22} />} 
-              label="付费订阅" 
-              active={currentView === View.SUBSCRIPTION} 
-              onClick={() => setCurrentView(View.SUBSCRIPTION)} 
             />
           </div>
 

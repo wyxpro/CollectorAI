@@ -6,7 +6,35 @@ export enum View {
   KNOWLEDGE = 'knowledge',
   LEARNING_DATA = 'learning_data',
   SETTINGS = 'settings',
-  SUBSCRIPTION = 'subscription'
+  SUBSCRIPTION = 'subscription',
+  PODCAST = 'podcast',
+  AI_QUIZ = 'ai_quiz'
+}
+
+export interface QuizQuestion {
+  id: string;
+  type: 'single' | 'multiple' | 'text';
+  question: string;
+  options?: string[]; // For single/multiple
+  correctAnswer?: number | number[]; // Index for single/multiple
+  explanation: string;
+  relatedArticleId: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface QuizResult {
+  questionId: string;
+  userAnswer: number | number[] | string;
+  isCorrect: boolean;
+  timestamp: string;
+}
+
+export interface QuizReport {
+  totalQuestions: number;
+  correctCount: number;
+  accuracy: number;
+  weakPoints: string[]; // Related article titles
+  results: QuizResult[];
 }
 
 export interface Article {

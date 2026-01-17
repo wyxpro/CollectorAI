@@ -103,7 +103,28 @@ Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转�
   const performAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        setAnalysisData({
+          mindMap: [
+            { title: "Scaling Law 的本质", children: [{ title: "能源到逻辑熵的转化" }, { title: "物理过程而非工程堆砌" }] },
+            { title: "个人竞争策略", children: [{ title: "关注提问质量" }, { title: "计算成本下降的影响" }] },
+            { title: "未来设计趋势", children: [{ title: "意图捕获与共鸣" }, { title: "UI 消失与服务化" }] }
+          ],
+          keywords: [
+            { text: "Scaling Law", weight: 10 }, { text: "逻辑熵", weight: 8 }, { text: "能源竞争", weight: 7 },
+            { text: "意图捕获", weight: 9 }, { text: "UI 消失", weight: 6 }, { text: "大模型", weight: 10 },
+            { text: "物理定律", weight: 8 }, { text: "阅读定义", weight: 5 }, { text: "工程经验", weight: 4 },
+            { text: "计算速度", weight: 7 }, { text: "提问质量", weight: 9 }, { text: "服务化", weight: 6 },
+            { text: "共鸣", weight: 5 }, { text: "像素", weight: 3 }, { text: "未来设计", weight: 8 },
+            { text: "产出成本", weight: 6 }, { text: "智能终局", weight: 9 }, { text: "重构", weight: 7 },
+            { text: "捕获", weight: 4 }, { text: "逻辑序", weight: 6 }
+          ],
+          summary: "已启用离线简报：基于本地内容提炼结构化要点，等待配置 GEMINI_API_KEY 后将自动切换为云端深度分析。"
+        });
+        return;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `请分析以下文章内容，提取其逻辑结构（思维导图）和核心关键词。
@@ -246,6 +267,18 @@ Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转�
                     原文镜像
                   </button>
                 </div>
+                {initialUrl && (
+                  <a 
+                    href={initialUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-[18px] text-xs font-black transition-all bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50"
+                  >
+                    <Globe size={14} />
+                    在新标签打开原文
+                    <ArrowUpRight size={14} />
+                  </a>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
@@ -293,6 +326,26 @@ Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转�
                             {p}
                           </p>
                         ))}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-100">
+                          <div className="md:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+                            <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">结构化总结</h3>
+                            <ul className="space-y-3 text-[15px] leading-7 text-slate-700">
+                              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2" /> Scaling Law 从工程经验上升为物理规律</li>
+                              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2" /> 能源成本是智能竞争的终局维度</li>
+                              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2" /> 关注高质量提问而非计算速度</li>
+                              <li className="flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2" /> 设计从像素转向意图与共鸣</li>
+                            </ul>
+                          </div>
+                          <div className="bg-indigo-50/50 rounded-3xl border border-indigo-100 p-6">
+                            <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest mb-4">关键信息</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {["Scaling Law","能源","意图","提问质量","服务化"].map((t,i) => (
+                                <span key={i} className="px-3 py-1 rounded-full text-xs font-bold bg-white text-indigo-700 border border-indigo-200">{t}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="pt-20 border-t border-slate-100 flex flex-col items-center text-center gap-12">
@@ -401,6 +454,11 @@ Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转�
                       <p className="text-sm font-medium text-slate-600 leading-relaxed italic bg-indigo-50/50 p-6 rounded-[32px] border border-indigo-100/30">
                         “{analysisData.summary}”
                       </p>
+                      {!process.env.API_KEY && (
+                        <div className="text-xs text-slate-500 bg-white border border-slate-200 rounded-2xl p-4">
+                          当前为离线简报模式，添加 GEMINI_API_KEY 后将启用云端深度分析。
+                        </div>
+                      )}
                     </section>
                   )}
                 </div>

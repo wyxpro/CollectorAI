@@ -25,6 +25,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Article } from '../types';
+import { MOCK_ARTICLES } from '../data/mockData';
 import { GoogleGenAI } from "@google/genai";
 
 interface LibraryViewProps {
@@ -42,8 +43,8 @@ const LibraryView: React.FC<LibraryViewProps> = ({ onSelectArticle }) => {
     { name: '全部', icon: <LayoutGrid size={14} />, color: 'bg-slate-100 text-slate-600' },
     { name: '公众号', icon: <MessageCircle size={14} />, color: 'bg-emerald-50 text-emerald-600', sourceKey: 'Medium' },
     { name: '小红书', icon: <Hash size={14} />, color: 'bg-rose-50 text-rose-600', sourceKey: 'UX Collective' },
-    { name: 'Medium', icon: <BookOpen size={14} />, color: 'bg-indigo-50 text-indigo-600', sourceKey: 'Medium' },
-    { name: 'ArXiv', icon: <FileText size={14} />, color: 'bg-blue-50 text-blue-600', sourceKey: 'ArXiv' },
+    { name: '哔哩哔哩', icon: <BookOpen size={14} />, color: 'bg-indigo-50 text-indigo-600', sourceKey: 'Medium' },
+    
   ];
 
   const statusMap: Record<string, string> = {
@@ -53,52 +54,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ onSelectArticle }) => {
     'completed': '已读完'
   };
 
-  const articles: Article[] = [
-    { 
-      id: '1', 
-      title: '蔡格尼克效应的心理学原理', 
-      author: 'Dr. Jane Smith', 
-      source: 'Medium', 
-      progress: 45, 
-      coverImage: 'https://picsum.photos/seed/psy/800/600',
-      wordCount: 1200,
-      estimatedTime: 8,
-      status: 'quiz_generated'
-    },
-    { 
-      id: '2', 
-      title: 'AI 如何重塑人类的好奇心', 
-      author: 'Tech Insight', 
-      source: 'Scientific American', 
-      progress: 0, 
-      coverImage: 'https://picsum.photos/seed/ai/800/600',
-      wordCount: 2500,
-      estimatedTime: 15,
-      status: 'parsed'
-    },
-    { 
-      id: '3', 
-      title: '为持续参与而设计', 
-      author: 'Liam Chen', 
-      source: 'UX Collective', 
-      progress: 100, 
-      coverImage: 'https://picsum.photos/seed/design/800/600',
-      wordCount: 1800,
-      estimatedTime: 12,
-      status: 'completed'
-    },
-    { 
-      id: '4', 
-      title: '神经接口的未来', 
-      author: 'Sarah Jenkins', 
-      source: 'ArXiv', 
-      progress: 0, 
-      coverImage: 'https://picsum.photos/seed/neuro/800/600',
-      wordCount: 5000,
-      estimatedTime: 30,
-      status: 'pending'
-    },
-  ];
+  const articles: Article[] = MOCK_ARTICLES;
 
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
@@ -299,19 +255,30 @@ const MindAssistant: React.FC<MindAssistantProps> = ({ articles, onClose }) => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
       const context = articles.map(a => `- ${a.title} (来自 ${a.source})`).join('\n');
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [{ role: 'user', parts: [{ text: messageText }] }],
-        config: {
-          systemInstruction: `你是一个专业的阅读助理。用户目前收藏了以下文章：\n${context}\n
-          请基于这些文章回答用户的问题。如果问题涉及文章之外的知识，请结合你的专业背景进行延伸。语气要富有启发性、简洁且有洞察力。`,
-        }
-      });
 
-      setMessages([...newMessages, { role: 'assistant', content: response.text || "我正在思考这个问题，请稍等..." }]);
+      if (!apiKey) {
+        const offline = [
+          "检测到未配置 GEMINI_API_KEY，启用本地离线总结模式。",
+          "以下是基于已收藏文章的简要洞察：",
+          context,
+          "",
+          "建议：在项目根目录创建 .env.local 并设置 GEMINI_API_KEY，以启用云端深度分析。"
+        ].join('\n');
+        setMessages([...newMessages, { role: 'assistant', content: offline }]);
+      } else {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: [{ role: 'user', parts: [{ text: messageText }] }],
+          config: {
+            systemInstruction: `你是一个专业的阅读助理。用户目前收藏了以下文章：\n${context}\n
+            请基于这些文章回答用户的问题。如果问题涉及文章之外的知识，请结合你的专业背景进行延伸。语气要富有启发性、简洁且有洞察力。`,
+          }
+        });
+        setMessages([...newMessages, { role: 'assistant', content: response.text || "我正在思考这个问题，请稍等..." }]);
+      }
     } catch (err) {
       setMessages([...newMessages, { role: 'assistant', content: "网络稍微有点波动，我无法连接到思维矩阵。请重试。" }]);
     } finally {

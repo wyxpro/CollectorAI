@@ -30,10 +30,102 @@ interface HistoryItem {
   timestamp: number;
 }
 
+interface DashboardPrompt {
+  badge: string;
+  question: string;
+  quote: string;
+  hint: string;
+  url?: string;
+}
+
+interface DashboardPromptCardProps {
+  prompt: DashboardPrompt;
+  onNext: () => void;
+}
+
+const DashboardPromptCard: React.FC<DashboardPromptCardProps> = ({ prompt, onNext }) => {
+  const surface =
+    "rounded-[44px] border border-slate-200/60 bg-white shadow-xl shadow-slate-200/30 overflow-hidden relative";
+  const buttonBase =
+    "inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition-all focus:outline-none focus:ring-4 focus:ring-indigo-500/15 active:scale-[0.98]";
+
+  return (
+    <section className={`${surface} p-6 md:p-8`}>
+      <div className="absolute inset-0 pointer-events-none select-none">
+        <div className="absolute -left-24 -top-24 h-[22rem] w-[22rem] rounded-full bg-indigo-200/45 blur-3xl" />
+        <div className="absolute -right-28 -bottom-28 h-[26rem] w-[26rem] rounded-full bg-violet-200/35 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(15,23,42,0.06)_1px,transparent_0)] [background-size:24px_24px]" />
+      </div>
+
+      <div className="relative grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-stretch">
+        <div className="rounded-[36px] border border-slate-200/60 bg-slate-50/70 p-7 md:p-8 shadow-inner shadow-white/60">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/15 to-indigo-600/15 ring-1 ring-slate-200/70">
+              <Zap size={16} className="text-emerald-600" />
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700/80">{prompt.badge}</span>
+          </div>
+
+          <h3 className="mt-5 text-3xl md:text-4xl font-black leading-[1.15] tracking-tight text-slate-900">
+            {prompt.question}
+          </h3>
+
+          <div className="mt-6 rounded-[30px] border border-slate-200/70 bg-white/70 p-7 shadow-sm">
+            <div className="text-6xl leading-none font-black text-slate-900/20">“</div>
+            <p className="mt-4 text-[16px] leading-[1.65] text-slate-700">{prompt.quote}</p>
+            <div className="mt-6 h-px bg-slate-200/70" />
+            <p className="mt-6 text-sm leading-[1.75] text-slate-600">{prompt.hint}</p>
+          </div>
+        </div>
+
+        <div className="rounded-[36px] border border-slate-200/60 bg-slate-50/70 p-7 md:p-8 flex flex-col gap-6 justify-between shadow-inner shadow-white/60">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">行动</div>
+              <div className="text-sm font-bold text-slate-900">先回答，再进入巩固</div>
+            </div>
+
+            {prompt.url ? (
+              <a
+                href={prompt.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${buttonBase} bg-white text-slate-900 border border-slate-200/70 hover:bg-slate-50 shadow-sm w-full`}
+              >
+                阅读原文
+              </a>
+            ) : (
+              <button
+                className={`${buttonBase} bg-slate-200/70 text-slate-400 cursor-not-allowed w-full border border-slate-200/70`}
+                disabled
+              >
+                阅读原文
+              </button>
+            )}
+
+            <button
+              onClick={onNext}
+              className={`${buttonBase} bg-gradient-to-b from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/20 hover:brightness-[1.02] w-full`}
+            >
+              下一个
+              <ArrowRight size={18} />
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-500 leading-relaxed">
+            轻量预热：先回答问题，再把你的答案丢给 AI 问答做巩固。
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
   const [inputValue, setInputValue] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [promptIndex, setPromptIndex] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem('read_history');
@@ -57,9 +149,27 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
   const stats = [
     { label: '已读文章', value: '12', icon: <BookOpen className="text-blue-500" size={18} />, trend: '+2', color: 'blue' },
     { label: '挑战积分', value: '1,280', icon: <Target className="text-emerald-500" size={18} />, trend: '98%', color: 'emerald' },
-    { label: '知识卡片', value: '256', icon: <Star className="text-indigo-500" size={18} />, trend: '+12', color: 'indigo' },
+    { label: 'AI 问答', value: '256', icon: <Star className="text-indigo-500" size={18} />, trend: '+12', color: 'indigo' },
     { label: '连续打卡', value: '4', icon: <Flame className="text-orange-500" size={18} />, trend: '天', color: 'orange' },
   ];
+
+  const prompts: DashboardPrompt[] = [
+    {
+      badge: '每日任务',
+      question: '你认为 Scaling Law 的“终局变量”是什么？',
+      quote: 'Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转化为“逻辑熵”的物理过程。',
+      hint: '把“终局变量”写成一句话：是算力、数据、算法，还是能源与基础设施？',
+      url: history[0]?.url,
+    },
+    {
+      badge: '热门讨论',
+      question: '当 UI 消失，产品的护城河会变成什么？',
+      quote: '未来的设计不再是关于像素的排列，而是关于“意图”的捕获与共鸣。界面（UI）将消失，取而代之的是服务（Service）。',
+      hint: '从“界面竞争”切到“意图竞争”：谁更理解用户的目标与上下文，谁就更接近答案。',
+      url: history[1]?.url,
+    },
+  ];
+  const activePrompt = prompts[promptIndex % prompts.length];
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 md:px-10 space-y-10 animate-in fade-in duration-700">
@@ -164,35 +274,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
             </div>
           </section>
 
-          {/* 每日挑战卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[40px] p-8 text-white relative overflow-hidden group cursor-pointer shadow-xl shadow-indigo-100">
-                <div className="absolute -right-6 -bottom-6 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                   <Target size={180} />
-                </div>
-                <div className="relative z-10 space-y-4">
-                   <div className="flex items-center gap-2">
-                     <Zap size={16} className="text-emerald-400" />
-                     <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100">每日任务</span>
-                   </div>
-                   <h3 className="text-2xl font-black">完成 3 场知识博弈</h3>
-                   <p className="text-indigo-100/70 text-sm leading-relaxed">解锁 3 个知识片段，可获得“深度阅读者”双倍积分奖励。</p>
-                </div>
-             </div>
-
-             <div className="bg-white border border-slate-200 rounded-[40px] p-8 flex flex-col justify-between hover:shadow-xl hover:shadow-slate-200/50 transition-all group">
-                <div className="space-y-4">
-                   <div className="flex items-center gap-2">
-                     <TrendingUp size={16} className="text-indigo-600" />
-                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">热门讨论</span>
-                   </div>
-                   <h3 className="text-2xl font-black text-slate-900 line-clamp-2">Scaling Law 的终局是什么？</h3>
-                </div>
-                <button className="mt-6 flex items-center gap-2 text-indigo-600 font-black text-sm group-hover:translate-x-2 transition-all">
-                   加入挑战 <ArrowRight size={16} />
-                </button>
-             </div>
-          </div>
+          <DashboardPromptCard
+            prompt={activePrompt}
+            onNext={() => setPromptIndex((i) => i + 1)}
+          />
         </div>
 
         {/* 右侧边栏 */}

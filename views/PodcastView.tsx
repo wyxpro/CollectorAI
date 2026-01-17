@@ -50,6 +50,8 @@ const PodcastView: React.FC = () => {
     // 创建音频元素
     if (!audioRef.current) {
       audioRef.current = new Audio();
+      audioRef.current.crossOrigin = 'anonymous'; // 处理CORS
+      audioRef.current.preload = 'metadata'; // 预加载元数据
       
       // 监听播放进度
       audioRef.current.addEventListener('timeupdate', () => {
@@ -64,19 +66,52 @@ const PodcastView: React.FC = () => {
       audioRef.current.addEventListener('loadedmetadata', () => {
         if (audioRef.current) {
           setDuration(audioRef.current.duration);
+          console.log('音频加载完成，时长:', audioRef.current.duration);
         }
+      });
+      
+      // 监听播放事件
+      audioRef.current.addEventListener('play', () => {
+        console.log('音频开始播放');
+        setIsPlaying(true);
+      });
+      
+      // 监听暂停事件
+      audioRef.current.addEventListener('pause', () => {
+        console.log('音频已暂停');
+        setIsPlaying(false);
       });
       
       // 监听播放结束
       audioRef.current.addEventListener('ended', () => {
+        console.log('音频播放结束');
         setIsPlaying(false);
         setProgress(0);
+      });
+      
+      // 监听错误
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('音频加载错误:', e);
+        setShowSuccess('音频加载失败，请检查网络连接');
+        setTimeout(() => setShowSuccess(''), 3000);
+        setIsPlaying(false);
+      });
+      
+      // 监听加载中
+      audioRef.current.addEventListener('loadstart', () => {
+        console.log('开始加载音频...');
+      });
+      
+      // 监听可以播放
+      audioRef.current.addEventListener('canplay', () => {
+        console.log('音频可以播放');
       });
     }
     
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = '';
         audioRef.current = null;
       }
     };
@@ -110,31 +145,93 @@ const PodcastView: React.FC = () => {
   // 加载音频文件
   useEffect(() => {
     if (activePodcast && audioRef.current) {
-      // 使用示例音频文件（你可以替换为实际的音频URL）
-      // 这里使用一个公开的示例音频
-      audioRef.current.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+      // 停止当前播放
+      audioRef.current.pause();
+      setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      
+      // 使用多个备用音频源
+      const audioSources = [
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+        'https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3',
+        'https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lepidoptera.ogg'
+      ];
+      
+      // 尝试加载第一个音频源
+      audioRef.current.src = audioSources[0];
       audioRef.current.load();
+      
+      console.log('加载播客音频:', activePodcast.title);
     }
   }, [activePodcast]);
 
   // 播放控制
-  const handlePlayPause = () => {
-    if (!audioRef.current) return;
+  const handlePlayPause = async () => {
+    if (!audioRef.current) {
+      console.error('音频播放器未初始化');
+      return;
+    }
     
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-        if (progress === 0) {
+    if (!activePodcast) {
+      setShowSuccess('请先选择一个播客');
+      setTimeout(() => setShowSuccess(''), 2000);
+      return;
+    }
+    
+    try {
+      if (isPlaying) {
+        // 暂停播放
+        audioRef.current.pause();
+        console.log('暂停播放');
+      } else {
+        // 开始播放
+        console.log('尝试播放音频...');
+        console.log('音频源:', audioRef.current.src);
+        console.log('音频就绪状态:', audioRef.current.readyState);
+        
+        // 确保音频已加载
+        if (audioRef.current.readyState < 2) {
+          console.log('音频未就绪，等待加载...');
+          setShowSuccess('正在加载音频...');
+          await new Promise((resolve) => {
+            const onCanPlay = () => {
+              audioRef.current?.removeEventListener('canplay', onCanPlay);
+              resolve(true);
+            };
+            audioRef.current?.addEventListener('canplay', onCanPlay);
+            audioRef.current?.load();
+          });
+          setShowSuccess('');
+        }
+        
+        // 播放音频
+        await audioRef.current.play();
+        console.log('播放成功');
+        
+        // 首次播放时增加播放计数
+        if (progress === 0 || currentTime === 0) {
           incrementPlayCount();
         }
-      }).catch(error => {
-        console.error('播放失败:', error);
-        setShowSuccess('播放失败，请重试');
-        setTimeout(() => setShowSuccess(''), 2000);
-      });
+      }
+    } catch (error: any) {
+      console.error('播放失败:', error);
+      
+      // 详细的错误处理
+      let errorMessage = '播放失败';
+      if (error.name === 'NotAllowedError') {
+        errorMessage = '浏览器阻止了自动播放，请点击播放按钮';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = '音频格式不支持';
+      } else if (error.name === 'AbortError') {
+        errorMessage = '音频加载被中断';
+      } else {
+        errorMessage = `播放失败: ${error.message}`;
+      }
+      
+      setShowSuccess(errorMessage);
+      setTimeout(() => setShowSuccess(''), 3000);
+      setIsPlaying(false);
     }
   };
   
@@ -156,7 +253,11 @@ const PodcastView: React.FC = () => {
     if (!audioRef.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
-    audioRef.current.currentTime = percent * audioRef.current.duration;
+    const targetTime = Math.max(0, Math.min(percent, 1)) * (audioRef.current.duration || 0);
+    audioRef.current.currentTime = targetTime;
+    setCurrentTime(targetTime);
+    const nextProgress = (audioRef.current.duration ? (targetTime / audioRef.current.duration) * 100 : 0);
+    setProgress(nextProgress);
   };
 
   const handleSelectPodcast = (id: string) => {
@@ -218,22 +319,22 @@ const PodcastView: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-slate-50/50 overflow-hidden">
+    <div className="h-full flex flex-col lg:flex-row bg-slate-50/50 overflow-hidden">
       {/* Success Toast */}
       {showSuccess && (
-        <div className="fixed top-4 right-4 bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 z-50 animate-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 left-4 sm:left-auto bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 z-50 animate-in slide-in-from-top-2">
           <CheckCircle size={16} /> {showSuccess}
         </div>
       )}
 
       {/* Left Sidebar: Playlist */}
-      <div className="w-full md:w-80 bg-white border-r border-slate-100 flex flex-col z-10">
-        <div className="p-6 border-b border-slate-50">
+      <div className="w-full lg:w-80 bg-white border-r border-slate-100 flex flex-col z-10 max-h-[50vh] lg:max-h-full">
+        <div className="p-4 sm:p-6 border-b border-slate-50">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-rose-100 text-rose-600 rounded-xl">
               <Headphones size={20} />
             </div>
-            <h2 className="text-lg font-bold text-slate-900">AI 播客生成</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">AI 播客生成</h2>
           </div>
           
           {/* Search */}
@@ -269,7 +370,7 @@ const PodcastView: React.FC = () => {
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
           {podcastsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-rose-600" size={32} />
@@ -284,16 +385,16 @@ const PodcastView: React.FC = () => {
               <div 
                 key={pod.id}
                 onClick={() => handleSelectPodcast(pod.id)}
-                className={`p-4 rounded-2xl cursor-pointer transition-all border group relative ${
+                className={`p-3 sm:p-4 rounded-2xl cursor-pointer transition-all border group relative min-h-touch ${
                   selectedPodcastId === pod.id 
                     ? 'bg-rose-50 border-rose-200 shadow-sm' 
-                    : 'bg-white border-slate-100 hover:border-rose-100'
+                    : 'bg-white border-slate-100 hover:border-rose-100 active:bg-slate-50'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <img src={pod.coverImage} alt={pod.title} className="w-12 h-12 rounded-lg object-cover" />
+                  <img src={pod.coverImage} alt={pod.title} className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-cover" />
                   <div className="flex-1 min-w-0">
-                    <h3 className={`font-bold text-sm mb-1 line-clamp-2 ${selectedPodcastId === pod.id ? 'text-rose-700' : 'text-slate-700'}`}>
+                    <h3 className={`font-bold text-sm sm:text-base mb-1 line-clamp-2 ${selectedPodcastId === pod.id ? 'text-rose-700' : 'text-slate-700'}`}>
                       {pod.title}
                     </h3>
                     <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -303,16 +404,16 @@ const PodcastView: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={(e) => handleToggleFavorite(pod.id, e)}
-                    className={`p-1.5 rounded-lg transition-colors ${pod.isFavorite ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-400 hover:text-rose-600'}`}
+                    className={`p-1.5 rounded-lg transition-colors min-w-touch min-h-touch flex items-center justify-center ${pod.isFavorite ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-400 hover:text-rose-600'}`}
                   >
                     <Heart size={14} className={pod.isFavorite ? 'fill-rose-600' : ''} />
                   </button>
                   <button
                     onClick={(e) => handleDelete(pod.id, e)}
-                    className="p-1.5 bg-slate-100 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                    className="p-1.5 bg-slate-100 text-slate-400 hover:text-red-600 rounded-lg transition-colors min-w-touch min-h-touch flex items-center justify-center"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -323,7 +424,7 @@ const PodcastView: React.FC = () => {
           
           <button
             onClick={() => setShowGenerateModal(true)}
-            className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2 hover:border-rose-200 hover:bg-rose-50/30 transition-colors group"
+            className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2 hover:border-rose-200 hover:bg-rose-50/30 transition-colors group min-h-touch"
           >
             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-rose-100 group-hover:text-rose-600 transition-colors">
               <Wand2 size={18} />
@@ -336,29 +437,29 @@ const PodcastView: React.FC = () => {
       {/* Main Content: Player & Script */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Header */}
-        <div className="h-16 border-b border-slate-100 bg-white/80 backdrop-blur-sm flex items-center justify-between px-8">
-           <div className="flex items-center gap-2 text-slate-400 text-sm">
-              <span className="font-medium text-slate-900">正在播放</span>
-              <span className="text-slate-300">/</span>
-              <span>{activePodcast?.title || '选择播客'}</span>
+        <div className="h-14 sm:h-16 border-b border-slate-100 bg-white/80 backdrop-blur-sm flex items-center justify-between px-4 sm:px-8">
+           <div className="flex items-center gap-2 text-slate-400 text-xs sm:text-sm min-w-0">
+              <span className="font-medium text-slate-900 truncate">正在播放</span>
+              <span className="text-slate-300 hidden sm:inline">/</span>
+              <span className="truncate hidden sm:inline">{activePodcast?.title || '选择播客'}</span>
            </div>
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2 sm:gap-4">
               <button 
                 onClick={() => setShowControls(!showControls)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-touch ${
                   showControls ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 <Settings2 size={14} />
-                语音调节
+                <span className="hidden sm:inline">语音调节</span>
               </button>
               {activePodcast && (
                 <button
                   onClick={() => handleDownload('high')}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                  className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors min-h-touch"
                 >
                   <Download size={14} />
-                  下载
+                  <span className="hidden sm:inline">下载</span>
                 </button>
               )}
            </div>
@@ -420,10 +521,10 @@ const PodcastView: React.FC = () => {
 
         {activePodcast ? (
           <>
-            <div className="flex-1 overflow-y-auto p-8 pb-32">
-              <div className="max-w-3xl mx-auto space-y-8">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 pb-32 sm:pb-32 smooth-scroll">
+              <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
                 {/* Waveform */}
-                <div className="bg-gradient-to-r from-rose-500 to-indigo-600 h-32 rounded-3xl shadow-lg flex items-center justify-center relative overflow-hidden">
+                <div className="bg-gradient-to-r from-rose-500 to-indigo-600 h-24 sm:h-32 rounded-2xl sm:rounded-3xl shadow-lg flex items-center justify-center relative overflow-hidden">
                    <div className="absolute inset-0 bg-black/10"></div>
                    <div className="flex items-center gap-1 h-12">
                      {[...Array(20)].map((_, i) => (
@@ -441,27 +542,27 @@ const PodcastView: React.FC = () => {
                 </div>
 
                 {/* Summary */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-                  <h3 className="font-black text-lg text-slate-900 mb-3">播客简介</h3>
-                  <p className="text-slate-600 leading-relaxed">{activePodcast.summary}</p>
+                <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100">
+                  <h3 className="font-black text-base sm:text-lg text-slate-900 mb-3">播客简介</h3>
+                  <p className="text-sm sm:text-base text-slate-600 leading-relaxed">{activePodcast.summary}</p>
                 </div>
 
                 {/* Script */}
-                <div className="space-y-6">
-                  <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
                     <Sparkles className="text-amber-500" size={20} />
                     AI 播客脚本
                   </h3>
                   <div className="space-y-4">
                     {activePodcast.script.map((line, i) => (
-                      <div key={i} className="flex gap-4 group">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                      <div key={i} className="flex gap-3 sm:gap-4 group">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
                           line.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-100 text-rose-600'
                         }`}>
-                          {line.role === 'ai' ? <BrainCircuit size={18} /> : <Volume2 size={18} />}
+                          {line.role === 'ai' ? <BrainCircuit size={16} className="sm:w-[18px] sm:h-[18px]" /> : <Volume2 size={16} className="sm:w-[18px] sm:h-[18px]" />}
                         </div>
                         <div className="flex-1">
-                          <p className="text-slate-800 leading-relaxed text-[15px] group-hover:bg-slate-50 p-2 rounded-lg -ml-2 transition-colors">
+                          <p className="text-sm sm:text-[15px] text-slate-800 leading-relaxed group-hover:bg-slate-50 p-2 rounded-lg -ml-2 transition-colors">
                             {line.text}
                           </p>
                         </div>
@@ -471,14 +572,14 @@ const PodcastView: React.FC = () => {
                 </div>
 
                 {/* Related Card */}
-                <div className="pt-8 border-t border-slate-100">
+                <div className="pt-6 sm:pt-8 border-t border-slate-100">
                    <div className="flex items-center gap-2 mb-4">
                      <BookOpen className="text-emerald-600" size={18} />
-                     <h4 className="font-bold text-slate-700">关联AI 问答</h4>
+                     <h4 className="font-bold text-sm sm:text-base text-slate-700">关联AI 问答</h4>
                    </div>
                    {MOCK_CARDS.map(card => (
-                     <div key={card.id} className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
-                        <p className="text-slate-800 font-medium mb-3">"{card.originalContent}"</p>
+                     <div key={card.id} className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 sm:p-5">
+                        <p className="text-sm sm:text-base text-slate-800 font-medium mb-3">"{card.originalContent}"</p>
                         <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold bg-white/50 w-fit px-2 py-1 rounded-md">
                            <BrainCircuit size={12} />
                            <span>{card.reflection}</span>
@@ -490,42 +591,42 @@ const PodcastView: React.FC = () => {
             </div>
 
             {/* Bottom Player Bar */}
-            <div className="h-24 bg-white border-t border-slate-100 absolute bottom-0 w-full px-8 flex items-center justify-between z-30 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-               <div className="flex items-center gap-4 w-1/3">
-                  <img src={activePodcast.coverImage} alt={activePodcast.title} className="w-12 h-12 rounded-xl object-cover shadow-md" />
-                  <div>
+            <div className="h-20 sm:h-24 bg-white border-t border-slate-100 absolute bottom-0 w-full px-4 sm:px-8 flex items-center justify-between z-30 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] safe-area-bottom">
+               <div className="flex items-center gap-3 sm:gap-4 w-1/3 min-w-0">
+                  <img src={activePodcast.coverImage} alt={activePodcast.title} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover shadow-md" />
+                  <div className="hidden sm:block min-w-0">
                      <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{activePodcast.title}</h4>
                      <p className="text-xs text-slate-500">AI Generated Podcast</p>
                   </div>
                </div>
 
                <div className="flex flex-col items-center gap-2 w-1/3">
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4 sm:gap-6">
                      <button 
                        onClick={handleSkipBackward}
-                       className="text-slate-400 hover:text-indigo-600 transition-colors"
+                       className="text-slate-400 hover:text-indigo-600 transition-colors min-w-touch min-h-touch flex items-center justify-center"
                        title="后退10秒"
                      >
-                       <SkipBack size={20} />
+                       <SkipBack size={18} className="sm:w-5 sm:h-5" />
                      </button>
                      <button 
                        onClick={handlePlayPause}
-                       className="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+                       className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
                      >
-                       {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                       {isPlaying ? <Pause size={20} className="sm:w-6 sm:h-6" fill="currentColor" /> : <Play size={20} className="sm:w-6 sm:h-6 ml-0.5" fill="currentColor" />}
                      </button>
                      <button 
                        onClick={handleSkipForward}
-                       className="text-slate-400 hover:text-indigo-600 transition-colors"
+                       className="text-slate-400 hover:text-indigo-600 transition-colors min-w-touch min-h-touch flex items-center justify-center"
                        title="前进10秒"
                      >
-                       <SkipForward size={20} />
+                       <SkipForward size={18} className="sm:w-5 sm:h-5" />
                      </button>
                   </div>
-                  <div className="w-full flex items-center gap-3 text-xs text-slate-400 font-medium font-mono">
+                  <div className="w-full flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-slate-400 font-medium font-mono">
                      <span>{formatTime(currentTime)}</span>
                      <div 
-                       className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer"
+                       className="flex-1 h-1 sm:h-1.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer"
                        onClick={handleProgressClick}
                      >
                         <div className="h-full bg-indigo-500 rounded-full transition-all duration-100" style={{ width: `${progress}%` }}></div>
@@ -534,19 +635,19 @@ const PodcastView: React.FC = () => {
                   </div>
                </div>
 
-               <div className="w-1/3 flex justify-end items-center gap-4">
-                   <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg text-xs font-bold text-slate-600 border border-slate-100">
-                      <Gauge size={14} className="text-indigo-500" />
+               <div className="w-1/3 flex justify-end items-center gap-2 sm:gap-4">
+                   <div className="flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-50 rounded-lg text-[10px] sm:text-xs font-bold text-slate-600 border border-slate-100">
+                      <Gauge size={12} className="sm:w-[14px] sm:h-[14px] text-indigo-500" />
                       <span>{settings.speed}x</span>
                    </div>
                </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-center">
-              <Headphones size={64} className="mx-auto mb-4 text-slate-300" />
-              <p className="text-slate-500">选择一个播客开始播放</p>
+              <Headphones size={48} className="sm:w-16 sm:h-16 mx-auto mb-4 text-slate-300" />
+              <p className="text-sm sm:text-base text-slate-500">选择一个播客开始播放</p>
             </div>
           </div>
         )}

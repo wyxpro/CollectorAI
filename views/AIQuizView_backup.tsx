@@ -32,7 +32,7 @@ const KnowledgeBase: React.FC = () => {
   const sampleCards: KnowledgeCard[] = [
     {
       id: '1',
-      originalContent: "Scaling Law 的本质并不是工程参数的堆砌，而是将‘能源’转化为‘逻辑熵’的物理过程。",
+      originalContent: "Scaling Law 的本质并不是工程参数的堆砌，而是转化为“逻辑熵"
       reflection: "这意味着 AI 的竞争终局可能是能源成本的竞争。对于个人而言，这意味着 we 应该更关注‘提问的质量’而非‘计算的速度’，因为逻辑序的产出成本正在急剧下降。",
       tags: ['AI 哲学', '物理学'],
       createdAt: '2024-03-20',

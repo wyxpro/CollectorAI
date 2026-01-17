@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   ShieldCheck, 
@@ -18,11 +18,11 @@ import {
   Bell, 
   RotateCcw,
   Search,
-  AlertCircle,
   Sparkles,
   CreditCard,
   Crown
 } from 'lucide-react';
+import { useUserSettings } from '../api/userHooks';
 
 interface SettingsViewProps {
   onUpgrade: () => void;
@@ -30,7 +30,26 @@ interface SettingsViewProps {
 
 const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'subscription' | 'personal' | 'insights' | 'help'>('profile');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+  
+  // 使用用户设置Hook
+  const userId = 'user_demo_123'; // 实际应该从认证系统获取
+  const { settings, updateTheme, updateNotifications } = useUserSettings(userId);
+  
+  // 本地主题状态（用于即时UI反馈）
+  const [localTheme, setLocalTheme] = useState<'light' | 'dark' | 'system'>('light');
+  
+  // 同步远程设置到本地状态
+  useEffect(() => {
+    if (settings) {
+      setLocalTheme(settings.theme);
+    }
+  }, [settings]);
+  
+  // 处理主题切换
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    setLocalTheme(newTheme);
+    await updateTheme(newTheme);
+  };
 
   const menuItems = [
     { id: 'profile', label: '个人资料', icon: <User size={18} /> },
@@ -56,7 +75,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
       case 'subscription':
         return <SubscriptionSection onUpgrade={onUpgrade} />;
       case 'personal':
-        return <PersonalizationSection theme={theme} setTheme={setTheme} />;
+        return <PersonalizationSection theme={localTheme} setTheme={handleThemeChange} updateNotifications={updateNotifications} />;
       case 'insights':
         return <InsightsManagementSection />;
       case 'help':
@@ -270,49 +289,93 @@ const SubscriptionSection = ({ onUpgrade }: { onUpgrade: () => void }) => (
 );
 
 /* --- Personalization Section --- */
-const PersonalizationSection = ({ theme, setTheme }: any) => (
-  <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
-    <div className="space-y-6">
-      <h4 className="font-bold text-slate-900 flex items-center gap-2">
-        <Palette size={20} className="text-indigo-600" /> 主题偏好
-      </h4>
-      <div className="grid grid-cols-3 gap-4">
-        {['light', 'dark', 'system'].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTheme(t)}
-            className={`flex flex-col items-center gap-3 p-6 rounded-[24px] border-2 transition-all ${
-              theme === t ? 'border-indigo-600 bg-indigo-50 shadow-lg shadow-indigo-100' : 'border-slate-100 hover:border-slate-200'
-            }`}
-          >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${t === 'light' ? 'bg-orange-100 text-orange-600' : t === 'dark' ? 'bg-slate-900 text-slate-200' : 'bg-slate-200 text-slate-600'}`}>
-              {t === 'light' ? <Sparkles size={20} /> : t === 'dark' ? <Monitor size={20} /> : <Globe size={20} />}
-            </div>
-            <span className="text-sm font-bold capitalize">{t === 'light' ? '浅色' : t === 'dark' ? '深色' : '跟随系统'}</span>
-          </button>
-        ))}
+const PersonalizationSection = ({ theme, setTheme, updateNotifications }: any) => {
+  const [notificationSettings, setNotificationSettings] = useState({
+    dailyChallenge: true,
+    knowledgeReview: false,
+    communityInteraction: true
+  });
+  
+  const handleNotificationToggle = async (key: string, value: boolean) => {
+    setNotificationSettings(prev => ({ ...prev, [key]: value }));
+    await updateNotifications({ [key]: value });
+  };
+  
+  return (
+    <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
+      <div className="space-y-6">
+        <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <Palette size={20} className="text-indigo-600" /> 主题偏好
+        </h4>
+        <div className="grid grid-cols-3 gap-4">
+          {['light', 'dark', 'system'].map((t) => (
+            <button
+              key={t}
+              onClick={() => setTheme(t)}
+              className={`flex flex-col items-center gap-3 p-6 rounded-[24px] border-2 transition-all ${
+                theme === t 
+                  ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/20' 
+                  : 'border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 bg-white dark:bg-slate-800'
+              }`}
+            >
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                t === 'light' 
+                  ? 'bg-orange-100 text-orange-600' 
+                  : t === 'dark' 
+                  ? 'bg-slate-900 text-slate-200' 
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}>
+                {t === 'light' ? <Sparkles size={20} /> : t === 'dark' ? <Monitor size={20} /> : <Globe size={20} />}
+              </div>
+              <span className={`text-sm font-bold capitalize ${
+                theme === t ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'
+              }`}>
+                {t === 'light' ? '浅色' : t === 'dark' ? '深色' : '跟随系统'}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <Bell size={20} className="text-indigo-600" /> 通知偏好
+        </h4>
+        <div className="space-y-3">
+          <ToggleItem 
+            label="每日阅读挑战提醒" 
+            active={notificationSettings.dailyChallenge}
+            onToggle={(value) => handleNotificationToggle('dailyChallenge', value)}
+          />
+          <ToggleItem 
+            label="知识点复习提醒" 
+            active={notificationSettings.knowledgeReview}
+            onToggle={(value) => handleNotificationToggle('knowledgeReview', value)}
+          />
+          <ToggleItem 
+            label="社区互动消息通知" 
+            active={notificationSettings.communityInteraction}
+            onToggle={(value) => handleNotificationToggle('communityInteraction', value)}
+          />
+        </div>
       </div>
     </div>
+  );
+};
 
-    <div className="space-y-6">
-      <h4 className="font-bold text-slate-900 flex items-center gap-2">
-        <Bell size={20} className="text-indigo-600" /> 通知偏好
-      </h4>
-      <div className="space-y-3">
-        <ToggleItem label="每日阅读挑战提醒" active={true} />
-        <ToggleItem label="知识点复习提醒" active={false} />
-        <ToggleItem label="社区互动消息通知" active={true} />
-      </div>
-    </div>
-  </div>
-);
-
-const ToggleItem = ({ label, active }: any) => (
-  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-    <span className="text-sm font-medium text-slate-700">{label}</span>
-    <div className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${active ? 'bg-indigo-600' : 'bg-slate-300'}`}>
-      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${active ? 'right-1' : 'left-1'}`} />
-    </div>
+const ToggleItem = ({ label, active, onToggle }: any) => (
+  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+    <button
+      onClick={() => onToggle?.(!active)}
+      className={`w-12 h-6 rounded-full relative transition-colors cursor-pointer ${
+        active ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+      }`}
+    >
+      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+        active ? 'right-1' : 'left-1'
+      }`} />
+    </button>
   </div>
 );
 

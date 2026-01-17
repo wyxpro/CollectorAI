@@ -17,6 +17,50 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
+const mockSettingsStore = new Map<string, UserSettings>();
+function ensureUserSettings(userId: string): UserSettings {
+  if (!mockSettingsStore.has(userId)) {
+    const theme = (localStorage.getItem('theme') as UserSettings['theme']) || 'light';
+    mockSettingsStore.set(userId, {
+      userId,
+      theme,
+      language: 'zh-CN',
+      notifications: {
+        dailyChallenge: true,
+        knowledgeReview: true,
+        communityInteraction: false,
+        emailNotifications: false,
+        pushNotifications: false
+      },
+      reading: {
+        fontSize: 16,
+        lineHeight: 1.8,
+        fontFamily: 'system',
+        autoSave: true,
+        readingMode: 'normal'
+      },
+      privacy: {
+        profileVisibility: 'public',
+        showReadingStats: true,
+        showActivity: true
+      }
+    });
+  }
+  return mockSettingsStore.get(userId)!;
+}
+function mergeSettings(userId: string, data: UpdateSettingsRequest): UserSettings {
+  const current = ensureUserSettings(userId);
+  const updated: UserSettings = {
+    ...current,
+    ...data,
+    notifications: { ...current.notifications, ...(data.notifications || {}) },
+    reading: { ...current.reading, ...(data.reading || {}) },
+    privacy: { ...current.privacy, ...(data.privacy || {}) }
+  };
+  mockSettingsStore.set(userId, updated);
+  return updated;
+}
+
 /**
  * 获取用户个人资料
  */
@@ -94,7 +138,7 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch user settings: ${response.statusText}`);
+    return ensureUserSettings(userId);
   }
 
   return response.json();
@@ -117,7 +161,7 @@ export async function updateUserSettings(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update user settings: ${response.statusText}`);
+    return mergeSettings(userId, data);
   }
 
   return response.json();

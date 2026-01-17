@@ -70,15 +70,15 @@ const App: React.FC = () => {
   const isReaderView = currentView === View.READER;
 
   return (
-    <div className={`flex h-screen ${isReaderView ? 'bg-[#0a0a0a]' : 'bg-white'} text-slate-900 overflow-hidden`}>
-      {/* Sidebar Navigation */}
+    <div className={`flex flex-col md:flex-row h-screen ${isReaderView ? 'bg-[#0a0a0a]' : 'bg-white'} text-slate-900 overflow-hidden`}>
+      {/* Desktop Sidebar Navigation */}
       {!isReaderView && (
-        <nav className="w-20 md:w-64 bg-white border-r border-slate-100 flex flex-col items-center md:items-stretch py-8 transition-all duration-300 z-50">
+        <nav className="hidden md:flex w-64 bg-white border-r border-slate-100 flex-col items-stretch py-8 transition-all duration-300 z-50">
           <div className="px-6 mb-12 flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[18px] flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50">
               <BrainCircuit className="text-white w-7 h-7" />
             </div>
-            <span className="hidden md:block text-2xl font-black tracking-tight text-slate-900">Collector +</span>
+            <span className="text-2xl font-black tracking-tight text-slate-900">Collector +</span>
           </div>
 
           <div className="flex-1 space-y-2 px-4 overflow-y-auto">
@@ -124,7 +124,7 @@ const App: React.FC = () => {
              {/* Upgrade Button in Sidebar */}
              <button 
               onClick={() => setCurrentView(View.SUBSCRIPTION)}
-              className="hidden md:flex w-full items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-[20px] text-white shadow-lg shadow-amber-100 hover:scale-[1.02] transition-all group"
+              className="flex w-full items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-[20px] text-white shadow-lg shadow-amber-100 hover:scale-[1.02] transition-all group"
              >
                 <Crown size={20} className="group-hover:rotate-12 transition-transform" />
                 <span className="text-sm font-black">升级到 PRO</span>
@@ -139,8 +139,46 @@ const App: React.FC = () => {
         </nav>
       )}
 
+      {/* Mobile Bottom Navigation */}
+      {!isReaderView && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50 safe-area-bottom">
+          <div className="flex justify-around items-center h-16 px-2">
+            <MobileNavItem 
+              icon={<LayoutDashboard size={20} />} 
+              label="首页" 
+              active={currentView === View.DASHBOARD} 
+              onClick={() => setCurrentView(View.DASHBOARD)} 
+            />
+            <MobileNavItem 
+              icon={<Library size={20} />} 
+              label="收录夹" 
+              active={currentView === View.LIBRARY} 
+              onClick={() => setCurrentView(View.LIBRARY)} 
+            />
+            <MobileNavItem 
+              icon={<MessageSquare size={20} />} 
+              label="问答" 
+              active={currentView === View.AI_QUIZ} 
+              onClick={() => setCurrentView(View.AI_QUIZ)} 
+            />
+            <MobileNavItem 
+              icon={<Headphones size={20} />} 
+              label="播客" 
+              active={currentView === View.PODCAST} 
+              onClick={() => setCurrentView(View.PODCAST)} 
+            />
+            <MobileNavItem 
+              icon={<Settings size={20} />} 
+              label="我的" 
+              active={currentView === View.SETTINGS} 
+              onClick={() => setCurrentView(View.SETTINGS)} 
+            />
+          </div>
+        </nav>
+      )}
+
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto relative bg-[#f8fafc]/30">
+      <main className={`flex-1 overflow-y-auto relative bg-[#f8fafc]/30 ${!isReaderView ? 'pb-16 md:pb-0' : ''}`}>
         {renderView()}
       </main>
     </div>
@@ -164,7 +202,22 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
     }`}
   >
     <span className={`transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</span>
-    <span className="hidden md:block text-[15px]">{label}</span>
+    <span className="text-[15px]">{label}</span>
+  </button>
+);
+
+// Mobile Navigation Item Component
+const MobileNavItem: React.FC<NavItemProps> = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center gap-1 min-w-touch min-h-touch px-2 py-1 rounded-xl transition-all ${
+      active 
+        ? 'text-indigo-600' 
+        : 'text-slate-400'
+    }`}
+  >
+    <span className={`transition-transform duration-200 ${active ? 'scale-110' : ''}`}>{icon}</span>
+    <span className="text-[10px] font-medium">{label}</span>
   </button>
 );
 

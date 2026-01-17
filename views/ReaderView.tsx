@@ -72,7 +72,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ articleId, initialUrl, onBack }
   // 模拟文章内容
   const articleContent = `在大模型时代，Scaling Law（规模法则）已经从一个工程经验上升到了物理定律的高度。AI 正在重构我们对“阅读”的定义。
 
-Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转化为“逻辑熵”的物理过程。这意味着 AI 的竞争终局可能是能源成本的竞争。
+Scaling Law 的本质并不是工程参数的堆砌，而是转化为“逻辑熵"。这意味着 AI 的竞争终局可能是能源成本的竞争。
 
 对于个人而言，这意味着我们应该更关注“提问的质量”而非“计算的速度”，因为逻辑序的产出成本正在急剧下降。未来的设计不再是关于像素的排列，而是关于“意图”的捕获与共鸣。界面（UI）将消失，取而代之的是服务（Service）。`;
 
@@ -230,7 +230,7 @@ Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转�
         </div>
       </div>
       <div className="text-center space-y-4">
-        <h2 className="text-3xl font-black text-white tracking-tighter">思维网络同步中</h2>
+        <h2 className="text-3xl font-black text-white tracking-tighter">AI解析加载中</h2>
         <p className="text-slate-400 text-sm max-w-xs mx-auto leading-relaxed">正在将非结构化网页转化为高维认知空间...</p>
       </div>
     </div>

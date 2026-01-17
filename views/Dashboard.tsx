@@ -157,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
     {
       badge: '每日任务',
       question: '你认为 Scaling Law 的“终局变量”是什么？',
-      quote: 'Scaling Law 的本质并不是工程参数的堆砌，而是将“能源”转化为“逻辑熵”的物理过程。',
+      quote: 'Scaling Law 的本质并不是工程参数的堆砌，而是转化为“逻辑熵"',
       hint: '把“终局变量”写成一句话：是算力、数据、算法，还是能源与基础设施？',
       url: history[0]?.url,
     },
@@ -217,7 +217,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
                 <div className="flex-1 text-center md:text-left space-y-3">
                   <h2 className="text-3xl font-black text-slate-900 tracking-tight">收藏内容解析引擎</h2>
                   <p className="text-slate-500 text-sm max-w-md leading-relaxed">
-                    AI 将为你拆解深度长文、视频或对话，提取认知切片并转化为互动挑战。
+                    AI 将为你拆解收藏长文，提取认知切片并转化为互动挑战。
                   </p>
                 </div>
               </div>

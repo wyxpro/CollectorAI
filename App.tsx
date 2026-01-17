@@ -101,16 +101,16 @@ const App: React.FC = () => {
               onClick={() => setCurrentView(View.KNOWLEDGE)} 
             />
             <NavItem 
-              icon={<Headphones size={22} />} 
-              label="AI 播客" 
-              active={currentView === View.PODCAST} 
-              onClick={() => setCurrentView(View.PODCAST)} 
-            />
-            <NavItem 
                icon={<MessageSquare size={22} />} 
               label="AI 问答" 
               active={currentView === View.AI_QUIZ} 
               onClick={() => setCurrentView(View.AI_QUIZ)} 
+            />
+            <NavItem 
+              icon={<Headphones size={22} />} 
+              label="AI 播客" 
+              active={currentView === View.PODCAST} 
+              onClick={() => setCurrentView(View.PODCAST)} 
             />
             <NavItem 
               icon={<BarChart3 size={22} />} 

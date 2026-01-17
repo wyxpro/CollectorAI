@@ -73,6 +73,7 @@ const LearningData: React.FC = () => {
   const [radarSeries, setRadarSeries] = useState(['User', 'Average']);
   const [rankingSort, setRankingSort] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [reportRange, setReportRange] = useState<'month' | 'year' | 'all'>('month');
   const itemsPerPage = 6;
 
   const heatmapData = useMemo(() => generateHeatmapData(), []);
@@ -97,26 +98,75 @@ const LearningData: React.FC = () => {
     alert(`正在导出 ${elementId} 为 ${format.toUpperCase()}，请稍候...`);
   };
 
+  const rangeStats = useMemo(() => {
+    if (reportRange === 'month') {
+      return {
+        minutes: '1,248',
+        focus: '88.5',
+        winRate: '94.2',
+        streak: '45',
+        subtitle: '基于本月的沉浸式数据分析'
+      };
+    }
+    if (reportRange === 'year') {
+      return {
+        minutes: '15,360',
+        focus: '86.2',
+        winRate: '91.7',
+        streak: '120',
+        subtitle: '基于年度汇总的趋势分析'
+      };
+    }
+    return {
+      minutes: '32,480',
+      focus: '84.0',
+      winRate: '89.3',
+      streak: '180',
+      subtitle: '全量历史数据总览'
+    };
+  }, [reportRange]);
+
   return (
     <div className="max-w-7xl mx-auto p-6 md:p-10 space-y-12 animate-in fade-in duration-700 pb-20">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">学习报告</h1>
-          <p className="text-slate-500 font-medium text-lg">基于 1,248 分钟的沉浸式数据分析。</p>
+          <p className="text-slate-500 font-medium text-lg">{rangeStats.subtitle}。</p>
         </div>
         <div className="flex gap-3 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-          <button className="px-6 py-2.5 bg-white text-indigo-600 text-sm font-black rounded-xl shadow-sm">本月</button>
-          <button className="px-6 py-2.5 text-slate-500 hover:text-slate-900 text-sm font-black rounded-xl transition-all">年度</button>
-          <button className="px-6 py-2.5 text-slate-500 hover:text-slate-900 text-sm font-black rounded-xl transition-all">全部数据</button>
+          <button
+            onClick={() => setReportRange('month')}
+            className={`px-6 py-2.5 text-sm font-black rounded-xl transition-all ${
+              reportRange === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            本月
+          </button>
+          <button
+            onClick={() => setReportRange('year')}
+            className={`px-6 py-2.5 text-sm font-black rounded-xl transition-all ${
+              reportRange === 'year' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            年度
+          </button>
+          <button
+            onClick={() => setReportRange('all')}
+            className={`px-6 py-2.5 text-sm font-black rounded-xl transition-all ${
+              reportRange === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            全部数据
+          </button>
         </div>
       </header>
 
       {/* 核心统计卡片（置于学习报告下方） */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <DataCard icon={<Clock className="text-indigo-600" />} title="本月累计时长" value="1,248" unit="分钟" trend="+12% 较上周" />
-        <DataCard icon={<Activity className="text-emerald-600" />} title="专注指数 P90" value="88.5" unit="分" trend="极高水平" />
-        <DataCard icon={<Zap className="text-amber-600" />} title="博弈挑战胜率" value="94.2" unit="%" trend="顶尖水平" />
-        <DataCard icon={<Flame className="text-orange-600" />} title="连续学习勋章" value="45" unit="天" trend="历史最高" />
+        <DataCard icon={<Clock className="text-indigo-600" />} title="累计时长" value={rangeStats.minutes} unit="分钟" trend="+12% 较上期" />
+        <DataCard icon={<Activity className="text-emerald-600" />} title="专注指数 P90" value={rangeStats.focus} unit="分" trend="稳定提升" />
+        <DataCard icon={<Zap className="text-amber-600" />} title="博弈挑战胜率" value={rangeStats.winRate} unit="%" trend="顶尖水平" />
+        <DataCard icon={<Flame className="text-orange-600" />} title="连续学习勋章" value={rangeStats.streak} unit="天" trend="历史最高" />
       </div>
 
       {/* 第一行：认知分布与多维评估 */}

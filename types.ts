@@ -79,3 +79,110 @@ export interface UserStats {
   cardsCreated: number;
   streak: number;
 }
+
+// User Profile Types
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  phone?: string;
+  avatar: string;
+  bio?: string;
+  motto?: string;
+  level: number;
+  xp: number;
+  joinedAt: string;
+  stats: UserProfileStats;
+}
+
+export interface UserProfileStats {
+  totalReadingTime: number; // in minutes
+  storageUsed: number; // in MB
+  storageLimit: number; // in MB
+  monthlyActivity: number; // percentage
+}
+
+export interface UpdateProfileRequest {
+  username?: string;
+  bio?: string;
+  motto?: string;
+  avatar?: string;
+}
+
+// User Settings Types
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type Language = 'zh-CN' | 'en-US' | 'ja-JP';
+
+export interface UserSettings {
+  userId: string;
+  theme: ThemeMode;
+  language: Language;
+  notifications: NotificationSettings;
+  reading: ReadingSettings;
+  privacy: PrivacySettings;
+}
+
+export interface NotificationSettings {
+  dailyChallenge: boolean;
+  knowledgeReview: boolean;
+  communityInteraction: boolean;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+}
+
+export interface ReadingSettings {
+  fontSize: number; // 12-24
+  lineHeight: number; // 1.5-2.5
+  fontFamily: 'system' | 'serif' | 'sans-serif';
+  autoSave: boolean;
+  readingMode: 'normal' | 'focus';
+}
+
+export interface PrivacySettings {
+  profileVisibility: 'public' | 'friends' | 'private';
+  showReadingStats: boolean;
+  showActivity: boolean;
+}
+
+export interface UpdateSettingsRequest {
+  theme?: ThemeMode;
+  language?: Language;
+  notifications?: Partial<NotificationSettings>;
+  reading?: Partial<ReadingSettings>;
+  privacy?: Partial<PrivacySettings>;
+}
+
+// Security Types
+export interface LoginDevice {
+  id: string;
+  deviceType: 'desktop' | 'mobile' | 'tablet';
+  deviceName: string;
+  browser: string;
+  location: string;
+  lastActive: string;
+  isCurrentDevice: boolean;
+  status: 'online' | 'offline';
+}
+
+export interface SecurityInfo {
+  lastPasswordChange: string;
+  phoneNumber?: string;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
+  loginDevices: LoginDevice[];
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UpdatePhoneRequest {
+  phoneNumber: string;
+  verificationCode: string;
+}
+
+export interface UpdateEmailRequest {
+  email: string;
+  verificationCode: string;
+}

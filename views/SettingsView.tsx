@@ -40,6 +40,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
     { id: 'insights', label: '收藏与清理', icon: <Heart size={18} /> },
     { id: 'help', label: '帮助中心', icon: <HelpCircle size={18} /> },
   ];
+  const sortedMenu = (() => {
+    const order = ['subscription', 'profile', 'security', 'personal', 'insights', 'help'];
+    const pos: Record<string, number> = {};
+    order.forEach((id, i) => (pos[id] = i));
+    return [...menuItems].sort((a, b) => (pos[a.id] ?? 999) - (pos[b.id] ?? 999));
+  })();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -71,7 +77,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ onUpgrade }) => {
         {/* Navigation */}
         <aside className="w-full lg:w-64 shrink-0">
           <div className="bg-white border border-slate-200 rounded-[32px] p-2 sticky top-24">
-            {menuItems.map((item) => (
+            {sortedMenu.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}

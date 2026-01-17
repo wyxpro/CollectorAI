@@ -182,8 +182,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
             <span className="text-slate-300">/</span>
             <span className="text-slate-400 text-xs font-medium">距离升级还需 240 XP</span>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">你好, Felix! 👋</h1>
-          <p className="text-slate-500 font-medium text-sm">今天想从哪里开始你的思维博弈？</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">你好, 朋友! 👋</h1>
+          <p className="text-slate-500 font-medium text-sm"></p>
         </div>
       </header>
 
@@ -215,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onStartReading }) => {
                 </div>
 
                 <div className="flex-1 text-center md:text-left space-y-3">
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">知识解构指挥中心</h2>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">收藏内容解析引擎</h2>
                   <p className="text-slate-500 text-sm max-w-md leading-relaxed">
                     AI 将为你拆解深度长文、视频或对话，提取认知切片并转化为互动挑战。
                   </p>

@@ -12,10 +12,26 @@ import {
   HelpCircle,
   Lightbulb,
   XCircle,
-  Target
+  Target,
+  MessageSquare, 
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  Plus,
+  Layout
 } from 'lucide-react';
 import { Article, QuizQuestion, QuizResult, QuizReport } from '../types';
 import { MOCK_ARTICLES } from '../data/mockData';
+
+// --- Types ---
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  relatedArticleId?: string;
+}
 
 // --- Mock Questions Generator ---
 const generateMockQuestions = (articles: Article[]): QuizQuestion[] => {
@@ -54,13 +70,51 @@ const generateMockQuestions = (articles: Article[]): QuizQuestion[] => {
 };
 
 const AIQuizView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'quiz' | 'mistakes' | 'report'>('quiz');
+  const [activeTab, setActiveTab] = useState<'quiz' | 'mistakes' | 'report' | 'ask'>('quiz');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]); // For current question
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false); // Current question submitted
   const [quizComplete, setQuizComplete] = useState(false); // All questions done
+
+  // --- Chat / Ask States ---
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('全部');
+
+  const handleSendMessage = () => {
+    if (!chatInput.trim()) return;
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: chatInput,
+      timestamp: new Date()
+    };
+
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    // Mock AI Response
+    setTimeout(() => {
+      const aiMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: selectedArticleId 
+          ? `基于《${MOCK_ARTICLES.find(a => a.id === selectedArticleId)?.title}》的内容，这是一个非常深刻的问题。文中核心观点指出，${userMsg.content.includes('为什么') ? '这背后的原因主要是认知负荷的分配问题。' : '这确实是一个值得探讨的现象。'} \n\n建议重点关注第三章关于“注意力机制”的论述。`
+          : '这是一个很好的通用问题。结合目前的知识库，我们可以从多个角度来分析这个问题。首先，...',
+        timestamp: new Date(),
+        relatedArticleId: selectedArticleId || undefined
+      };
+      setChatHistory(prev => [...prev, aiMsg]);
+      setIsChatLoading(false);
+    }, 1500);
+  };
+
 
   // Load questions on mount
   useEffect(() => {
@@ -131,6 +185,192 @@ const AIQuizView: React.FC = () => {
 
   // --- Render Components ---
 
+  const renderAskArea = () => {
+    const categories = {
+      '全部': MOCK_ARTICLES,
+      '心理学': MOCK_ARTICLES.filter(a => ['1', '2'].includes(a.id)),
+      '科技': MOCK_ARTICLES.filter(a => ['2', '4'].includes(a.id)),
+      '设计': MOCK_ARTICLES.filter(a => ['3'].includes(a.id))
+    };
+
+    return (
+      <div className="flex-1 flex h-full overflow-hidden bg-slate-50/30">
+        {/* Left: Article Selector */}
+        <div className="w-72 bg-white border-r border-slate-100 flex flex-col hidden lg:flex">
+          <div className="p-4 border-b border-slate-50">
+             <h3 className="font-bold text-slate-800 mb-4 px-2">选择资料库</h3>
+             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+               {Object.keys(categories).map(cat => (
+                 <button 
+                   key={cat}
+                   onClick={() => setActiveCategory(cat)}
+                   className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                     activeCategory === cat ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                   }`}
+                 >
+                   {cat}
+                 </button>
+               ))}
+             </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <button 
+               onClick={() => setSelectedArticleId(null)}
+               className={`w-full text-left p-3 rounded-xl transition-all border ${
+                 selectedArticleId === null 
+                   ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200' 
+                   : 'bg-white border-transparent hover:bg-slate-50'
+               }`}
+            >
+               <div className="flex items-center gap-2 mb-1">
+                 <div className={`p-1.5 rounded-lg ${selectedArticleId === null ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                    <Layout size={14} />
+                 </div>
+                 <span className={`text-sm font-bold ${selectedArticleId === null ? 'text-indigo-900' : 'text-slate-700'}`}>综合问答</span>
+               </div>
+               <p className="text-xs text-slate-400 line-clamp-1">基于所有收藏内容进行回答</p>
+            </button>
+
+            {categories[activeCategory as keyof typeof categories]?.map(article => (
+               <button 
+                 key={article.id}
+                 onClick={() => setSelectedArticleId(article.id)}
+                 className={`w-full text-left p-3 rounded-xl transition-all border group ${
+                   selectedArticleId === article.id 
+                     ? 'bg-white border-indigo-200 ring-1 ring-indigo-200 shadow-sm' 
+                     : 'bg-white border-transparent hover:bg-slate-50'
+                 }`}
+               >
+                 <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                       <img src={article.coverImage} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                       <h4 className={`text-sm font-bold truncate mb-0.5 ${selectedArticleId === article.id ? 'text-indigo-900' : 'text-slate-700 group-hover:text-indigo-700'}`}>{article.title}</h4>
+                       <p className="text-xs text-slate-400 truncate">{article.author}</p>
+                    </div>
+                 </div>
+               </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Chat Area */}
+        <div className="flex-1 flex flex-col h-full relative">
+           {/* Chat Header */}
+           <div className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0 z-10">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Sparkles size={16} />
+                 </div>
+                 <div>
+                    <h2 className="font-bold text-slate-900">AI 学习助手</h2>
+                    <p className="text-xs text-slate-500">
+                      {selectedArticleId 
+                        ? `正在基于《${MOCK_ARTICLES.find(a => a.id === selectedArticleId)?.title}》回答` 
+                        : '全库搜索模式'}
+                    </p>
+                 </div>
+              </div>
+              <button 
+                onClick={() => setChatHistory([])}
+                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                title="清空对话"
+              >
+                 <RotateCcw size={18} />
+              </button>
+           </div>
+
+           {/* Chat Messages */}
+           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {chatHistory.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-50 p-10">
+                   <Bot size={48} className="text-indigo-300 mb-4" />
+                   <h3 className="font-bold text-slate-700 mb-2">有什么可以帮你的吗？</h3>
+                   <p className="text-sm text-slate-500 max-w-xs">你可以选择左侧的文章进行针对性提问，或者直接开始对话。</p>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-8 w-full max-w-md">
+                      {['这篇文章的核心观点是什么？', '作者如何看待这个问题？', '帮我生成 3 个复习题', '解释文中的关键术语'].map(q => (
+                        <button 
+                          key={q}
+                          onClick={() => setChatInput(q)} 
+                          className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors text-left"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+              )}
+
+              {chatHistory.map((msg) => (
+                <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                     msg.role === 'user' ? 'bg-slate-900 text-white' : 'bg-indigo-600 text-white'
+                   }`}>
+                      {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
+                   </div>
+                   <div className={`max-w-[80%] space-y-2`}>
+                      <div className={`p-4 rounded-2xl leading-relaxed text-sm ${
+                        msg.role === 'user' 
+                          ? 'bg-slate-900 text-white rounded-tr-none' 
+                          : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
+                      }`}>
+                         <div className="whitespace-pre-wrap">{msg.content}</div>
+                      </div>
+                      {msg.relatedArticleId && (
+                        <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg w-fit cursor-pointer hover:bg-indigo-100 transition-colors">
+                           <BookOpen size={12} />
+                           <span className="font-bold">参考来源: {MOCK_ARTICLES.find(a => a.id === msg.relatedArticleId)?.title}</span>
+                        </div>
+                      )}
+                   </div>
+                </div>
+              ))}
+
+              {isChatLoading && (
+                 <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                       <Bot size={16} />
+                    </div>
+                    <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1 items-center">
+                       <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                       <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                       <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                 </div>
+              )}
+           </div>
+
+           {/* Chat Input */}
+           <div className="p-4 bg-white border-t border-slate-100">
+              <div className="max-w-4xl mx-auto relative">
+                 <textarea
+                   value={chatInput}
+                   onChange={(e) => setChatInput(e.target.value)}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter' && !e.shiftKey) {
+                       e.preventDefault();
+                       handleSendMessage();
+                     }
+                   }}
+                   placeholder="输入你的问题..."
+                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-4 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none h-14 max-h-32 transition-all text-sm font-medium scrollbar-hide"
+                 />
+                 <button 
+                   onClick={handleSendMessage}
+                   disabled={!chatInput.trim() || isChatLoading}
+                   className="absolute right-2 top-2 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-all shadow-md shadow-indigo-200"
+                 >
+                    <Send size={18} />
+                 </button>
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSidebar = () => (
     <div className="w-full md:w-80 bg-white border-r border-slate-100 flex flex-col h-full z-10">
       <div className="p-6 border-b border-slate-50">
@@ -139,9 +379,34 @@ const AIQuizView: React.FC = () => {
           AI 问答
         </h2>
         <p className="text-xs text-slate-500 mt-2">基于你的收录夹自动生成的个性化挑战。</p>
+        <div className="mt-4">
+          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200">
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy size={16} className="text-amber-300" />
+              <span className="font-bold text-sm">连胜挑战</span>
+            </div>
+            <p className="text-xs opacity-90 mb-3">你已连续答对 {quizResults.filter(r => r.isCorrect).length} 题！保持势头。</p>
+            <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-amber-300 h-full w-3/4"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
+        <button 
+          onClick={() => setActiveTab('ask')}
+          className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
+            activeTab === 'ask' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <MessageSquare size={18} />
+            <span>AI 答疑</span>
+          </div>
+          {activeTab === 'ask' && <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />}
+        </button>
+
         <button 
           onClick={() => setActiveTab('quiz')}
           className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
@@ -183,18 +448,7 @@ const AIQuizView: React.FC = () => {
         </button>
       </nav>
 
-      <div className="p-4 border-t border-slate-50">
-        <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy size={16} className="text-amber-300" />
-            <span className="font-bold text-sm">连胜挑战</span>
-          </div>
-          <p className="text-xs opacity-90 mb-3">你已连续答对 {quizResults.filter(r => r.isCorrect).length} 题！保持势头。</p>
-          <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-amber-300 h-full w-3/4"></div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 
@@ -431,6 +685,7 @@ const AIQuizView: React.FC = () => {
     <div className="h-full flex flex-col md:flex-row overflow-hidden bg-white">
       {renderSidebar()}
       
+      {activeTab === 'ask' && renderAskArea()}
       {activeTab === 'quiz' && renderQuizArea()}
       {activeTab === 'mistakes' && renderMistakes()}
       {activeTab === 'report' && renderReport()}

@@ -222,7 +222,7 @@ const SubscriptionSection = ({ onUpgrade }: { onUpgrade: () => void }) => (
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
             当前计划
           </div>
-          <h4 className="text-4xl font-black tracking-tight">Read AI 免费版</h4>
+          <h4 className="text-4xl font-black tracking-tight">Collector + 免费版</h4>
           <p className="text-indigo-200/70 text-sm font-medium">体验 AI 阅读的魅力，升级以解锁更多特权。</p>
           <div className="pt-4 space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold">

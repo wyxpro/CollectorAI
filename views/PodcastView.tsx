@@ -39,6 +39,48 @@ const PodcastView: React.FC = () => {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState('');
+  
+  // 音频播放器引用
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // 初始化音频播放器
+  useEffect(() => {
+    // 创建音频元素
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      
+      // 监听播放进度
+      audioRef.current.addEventListener('timeupdate', () => {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+          const progress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+          setProgress(progress || 0);
+        }
+      });
+      
+      // 监听音频加载完成
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        if (audioRef.current) {
+          setDuration(audioRef.current.duration);
+        }
+      });
+      
+      // 监听播放结束
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setProgress(0);
+      });
+    }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // 自动选择第一个播客
   useEffect(() => {
@@ -58,35 +100,72 @@ const PodcastView: React.FC = () => {
     }
   }, [searchQuery, showFavoritesOnly]);
 
-  // 播放进度模拟
+  // 更新播放速度
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && settings) {
-      interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 100) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return p + (0.5 * settings.speed);
-        });
-      }, 100);
+    if (audioRef.current && settings) {
+      audioRef.current.playbackRate = settings.speed;
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, settings]);
+  }, [settings?.speed]);
+  
+  // 加载音频文件
+  useEffect(() => {
+    if (activePodcast && audioRef.current) {
+      // 使用示例音频文件（你可以替换为实际的音频URL）
+      // 这里使用一个公开的示例音频
+      audioRef.current.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+      audioRef.current.load();
+    }
+  }, [activePodcast]);
 
   // 播放控制
   const handlePlayPause = () => {
-    if (!isPlaying && progress === 0) {
-      incrementPlayCount();
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+        if (progress === 0) {
+          incrementPlayCount();
+        }
+      }).catch(error => {
+        console.error('播放失败:', error);
+        setShowSuccess('播放失败，请重试');
+        setTimeout(() => setShowSuccess(''), 2000);
+      });
     }
-    setIsPlaying(!isPlaying);
+  };
+  
+  // 快进/快退
+  const handleSkipForward = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 10, audioRef.current.duration);
+    }
+  };
+  
+  const handleSkipBackward = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 10, 0);
+    }
+  };
+  
+  // 进度条点击
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    audioRef.current.currentTime = percent * audioRef.current.duration;
   };
 
   const handleSelectPodcast = (id: string) => {
     setSelectedPodcastId(id);
     setProgress(0);
-    setIsPlaying(true);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -128,12 +207,9 @@ const PodcastView: React.FC = () => {
     }
   };
 
-  const formatTime = (percent: number, totalDurationStr: string) => {
-    const [min, sec] = totalDurationStr.split(':').map(Number);
-    const totalSeconds = min * 60 + sec;
-    const currentSeconds = Math.floor((percent / 100) * totalSeconds);
-    const m = Math.floor(currentSeconds / 60);
-    const s = currentSeconds % 60;
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' + s : s}`;
   };
 
@@ -425,21 +501,36 @@ const PodcastView: React.FC = () => {
 
                <div className="flex flex-col items-center gap-2 w-1/3">
                   <div className="flex items-center gap-6">
-                     <button className="text-slate-400 hover:text-indigo-600 transition-colors"><SkipBack size={20} /></button>
+                     <button 
+                       onClick={handleSkipBackward}
+                       className="text-slate-400 hover:text-indigo-600 transition-colors"
+                       title="后退10秒"
+                     >
+                       <SkipBack size={20} />
+                     </button>
                      <button 
                        onClick={handlePlayPause}
                        className="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
                      >
                        {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                      </button>
-                     <button className="text-slate-400 hover:text-indigo-600 transition-colors"><SkipForward size={20} /></button>
+                     <button 
+                       onClick={handleSkipForward}
+                       className="text-slate-400 hover:text-indigo-600 transition-colors"
+                       title="前进10秒"
+                     >
+                       <SkipForward size={20} />
+                     </button>
                   </div>
                   <div className="w-full flex items-center gap-3 text-xs text-slate-400 font-medium font-mono">
-                     <span>{formatTime(progress, activePodcast.duration)}</span>
-                     <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer">
-                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                     <span>{formatTime(currentTime)}</span>
+                     <div 
+                       className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer"
+                       onClick={handleProgressClick}
+                     >
+                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-100" style={{ width: `${progress}%` }}></div>
                      </div>
-                     <span>{activePodcast.duration}</span>
+                     <span>{formatTime(duration)}</span>
                   </div>
                </div>
 

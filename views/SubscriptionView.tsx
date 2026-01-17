@@ -104,7 +104,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ onBack }) => {
         <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
           <div className="text-center space-y-4">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-full text-xs font-black uppercase tracking-widest border border-amber-100 mb-2">
-              <Crown size={14} /> 开启 Read AI PRO 时代
+              <Crown size={14} /> 开启 Collector + PRO 时代
             </div>
             <h1 className="text-5xl font-black text-slate-900 tracking-tight">选择适合您的思维进化方案</h1>
             <p className="text-slate-500 max-w-2xl mx-auto text-lg">
@@ -341,7 +341,7 @@ const SubscriptionView: React.FC<SubscriptionViewProps> = ({ onBack }) => {
           <div className="space-y-4">
             <h2 className="text-5xl font-black text-slate-900 tracking-tight">欢迎加入 PRO 探索者！</h2>
             <p className="text-slate-500 text-lg font-medium leading-relaxed max-w-sm mx-auto">
-              您的订阅已成功激活。现在，您可以尽情享受 Read AI 的所有高级功能了。
+              您的订阅已成功激活。现在，您可以尽情享受 Collector + 的所有高级功能了。
             </p>
           </div>
 

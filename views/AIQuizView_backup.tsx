@@ -176,7 +176,7 @@ const KnowledgeBase: React.FC = () => {
                 <div className="relative z-10 flex flex-col justify-end h-full">
                   <div className="flex items-center gap-2 mb-2">
                     <BrainCircuit size={16} className="text-white/60" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Read AI 思维切片</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Collector + 思维切片</span>
                   </div>
                   <h3 className="text-xl font-black leading-tight line-clamp-2">{shareCard.articleTitle}</h3>
                 </div>
@@ -212,7 +212,7 @@ const KnowledgeBase: React.FC = () => {
                         <BrainCircuit size={18} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-slate-900 leading-none">Read AI</p>
+                        <p className="text-[10px] font-black text-slate-900 leading-none">Collector +</p>
                         <p className="text-[8px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">Gamified Mastery</p>
                       </div>
                     </div>

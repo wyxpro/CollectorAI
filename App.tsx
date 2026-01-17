@@ -78,7 +78,7 @@ const App: React.FC = () => {
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[18px] flex items-center justify-center shadow-lg shadow-indigo-100 ring-4 ring-indigo-50">
               <BrainCircuit className="text-white w-7 h-7" />
             </div>
-            <span className="hidden md:block text-2xl font-black tracking-tight text-slate-900">Read AI</span>
+            <span className="hidden md:block text-2xl font-black tracking-tight text-slate-900">Collector +</span>
           </div>
 
           <div className="flex-1 space-y-2 px-4 overflow-y-auto">

@@ -49,7 +49,7 @@ class PodcastDatabase {
         duration: '01:15',
         summary: '蔡格尼克效应揭示了人类对未完成任务的执念。本期播客将带你深入探讨这一心理机制，并结合 Quiz 挑战你的认知盲区。核心观点：未完成的任务会占据我们的认知带宽。',
         script: [
-          { role: 'host', text: '大家好，欢迎来到 Read AI 每日洞察。今天我们要聊的是"蔡格尼克效应"。', timestamp: 0 },
+          { role: 'host', text: '大家好，欢迎来到 Collector + 每日洞察。今天我们要聊的是"蔡格尼克效应"。', timestamp: 0 },
           { role: 'ai', text: '简单来说，就是为什么你总是忘不了那些没做完的事。', timestamp: 8 },
           { role: 'host', text: '没错，研究发现未完成的任务会持续占用我们的短期记忆。', timestamp: 15 },
           { role: 'ai', text: '听完这段，来个小挑战：你觉得这种效应对拖延症是好是坏？', timestamp: 25 }
@@ -160,7 +160,7 @@ class PodcastDatabase {
         podcast.status = 'ready';
         podcast.summary = '基于您的内容生成的AI播客，深入浅出地解析核心观点。';
         podcast.script = [
-          { role: 'host', text: '欢迎来到 Read AI，今天我们来聊聊这个有趣的话题。', timestamp: 0 },
+          { role: 'host', text: '欢迎来到 Collector +，今天我们来聊聊这个有趣的话题。', timestamp: 0 },
           { role: 'ai', text: '让我们从核心概念开始，逐步深入探讨。', timestamp: 8 },
           { role: 'host', text: '这个观点确实很有启发性，值得我们深入思考。', timestamp: 18 },
           { role: 'ai', text: '总结一下，关键在于理解背后的原理并应用到实践中。', timestamp: 28 }

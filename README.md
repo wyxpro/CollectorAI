@@ -1,8 +1,8 @@
-# 🧠 Read AI - Gamified Reading Platform
+# 🧠 Collector + - Gamified Reading Platform
 
 ## 📋 项目简介 (Introduction)
 
-**Read AI** 是一个探索未来的**游戏化深度阅读平台**。它不只是一个阅读器，更是一个“认知健身房”。它利用 AI 技术将被动的内容消费转化为主动的思维博弈。
+**Collector +** 是一个探索未来的游戏化深度阅读平台，有效利用游戏化、多模态AI交互重构收藏夹内容阅读链路，让收藏内容高效消化、深度沉淀，打造“高效读，趣味传”的全场景阅读生态。
 
 ### 核心理念
 *   **输入即博弈**：不再“收藏进灰”，而是通过 AI 生成的 Quiz 挑战来验证理解。
@@ -144,7 +144,7 @@ npm run build
 ---
 
 ## 🤝 贡献 (Contributing)
-欢迎提交 Issue 或 Pull Request 来改进 Read AI！
+欢迎提交 Issue 或 Pull Request 来改进 Collector +！
 目前的 Roadmap 包括：
 - [ ] 接入真实的 Vector Database (如 Pinecone)
 - [ ] 增加浏览器插件端 (Chrome Extension)
@@ -153,5 +153,5 @@ npm run build
 ---
 
 <div align="center">
-  <p>Made with ❤️ by Read AI Team</p>
+  <p>Made with ❤️ by Collector + Team</p>
 </div>

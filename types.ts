@@ -71,6 +71,7 @@ export interface KnowledgeCard {
   tags: string[];
   createdAt: string;
   articleTitle: string;
+  articleImage?: string;
 }
 
 export interface UserStats {

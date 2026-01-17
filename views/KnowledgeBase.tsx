@@ -132,6 +132,7 @@ const KnowledgeBase: React.FC = () => {
       tags: ['AI 哲学', '物理学'],
       createdAt: '2024-03-20',
       articleTitle: 'Scaling Law 与智能终局',
+      articleImage: 'https://picsum.photos/seed/ai/800/600'
     },
     {
       id: '2',
@@ -140,6 +141,7 @@ const KnowledgeBase: React.FC = () => {
       tags: ['心理学', '生产力'],
       createdAt: '2024-03-18',
       articleTitle: '心智的逻辑缺陷',
+      articleImage: 'https://picsum.photos/seed/psy/800/600'
     },
     {
       id: '3',
@@ -148,6 +150,7 @@ const KnowledgeBase: React.FC = () => {
       tags: ['设计趋势', 'UX'],
       createdAt: '2024-03-15',
       articleTitle: '为持续参与而设计',
+      articleImage: 'https://picsum.photos/seed/design/800/600'
     },
     {
       id: '4',
@@ -156,6 +159,7 @@ const KnowledgeBase: React.FC = () => {
       tags: ['生产力', '认知'],
       createdAt: '2024-03-12',
       articleTitle: '专注力夺还战',
+      articleImage: 'https://picsum.photos/seed/work/800/600'
     },
     {
       id: '5',
@@ -164,6 +168,7 @@ const KnowledgeBase: React.FC = () => {
       tags: ['哲学', '阅读方法'],
       createdAt: '2024-03-10',
       articleTitle: '镜面阅读法',
+      articleImage: 'https://picsum.photos/seed/book/800/600'
     }
   ];
 
@@ -363,72 +368,75 @@ const KnowledgeBase: React.FC = () => {
             </button>
           </div>
           
-          <div className="flex flex-col items-center gap-8 max-w-full scale-90 md:scale-100">
+          <div className="flex flex-col items-center gap-6 max-w-full scale-90 md:scale-100">
             {/* The Poster Image UI */}
-            <div id="share-poster" className="bg-white w-[400px] rounded-[56px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500 border border-white/20">
-              <div className={`h-48 ${THEMES[sampleCards.indexOf(shareCard) % THEMES.length].bgClass} p-12 text-white relative overflow-hidden`}>
-                {THEMES[sampleCards.indexOf(shareCard) % THEMES.length].renderBackground && THEMES[sampleCards.indexOf(shareCard) % THEMES.length].renderBackground()}
-                {!THEMES[sampleCards.indexOf(shareCard) % THEMES.length].renderBackground && <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>}
+            <div id="share-poster" className="bg-white w-[360px] rounded-[40px] overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500 border border-white/20">
+              <div className={`h-40 ${currentTheme.bgClass} p-8 ${currentTheme.textClass} relative overflow-hidden`}>
+                {currentTheme.renderBackground && currentTheme.renderBackground()}
+                {!currentTheme.renderBackground && <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>}
                 
                 <div className="relative z-10 flex flex-col justify-end h-full">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center">
-                      <BrainCircuit size={16} className="text-white" />
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-6 h-6 ${currentTheme.accentClass} backdrop-blur-md rounded-md flex items-center justify-center`}>
+                      <BrainCircuit size={12} />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/70">Read AI 思维切片</span>
+                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${currentTheme.subTextClass} opacity-80`}>Collector + 思维切片</span>
                   </div>
-                  <h3 className="text-2xl font-black leading-tight line-clamp-2 tracking-tight">{shareCard.articleTitle}</h3>
+                  <h3 className="text-xl font-black leading-tight line-clamp-2 tracking-tight">{shareCard.articleTitle}</h3>
                 </div>
               </div>
               
-              <div className="p-12 space-y-10 bg-white">
+              <div className="p-8 space-y-6 bg-white">
                 <div className="relative">
-                  <span className="text-8xl text-indigo-50 font-serif absolute -top-12 -left-6 select-none leading-none">“</span>
-                  <p className="text-2xl font-black text-slate-900 leading-[1.6] relative z-10 tracking-tight">
+                  <span className="text-6xl text-indigo-50 font-serif absolute -top-8 -left-4 select-none leading-none">“</span>
+                  <p className="text-lg font-black text-slate-900 leading-[1.6] relative z-10 tracking-tight">
                     {shareCard.originalContent}
                   </p>
                 </div>
   
-                <div className="bg-indigo-50/50 rounded-[32px] p-8 border border-indigo-100/50 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-5">
-                    <Zap size={64} className="text-indigo-600" />
+                {/* Image Replaces Reflection */}
+                {shareCard.articleImage && (
+                  <div className="relative rounded-2xl overflow-hidden shadow-sm aspect-video group transform transition-all hover:shadow-md">
+                     <img 
+                       src={shareCard.articleImage} 
+                       alt="Article Cover"
+                       className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-1000" 
+                     />
+                     <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+                     <div className="absolute bottom-2 left-2 bg-black/30 backdrop-blur-md px-2 py-1 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <LinkIcon size={10} />
+                        <span>阅读原文</span>
+                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mb-4 relative z-10">
-                    <Zap size={14} className="text-indigo-600" fill="currentColor" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600/70">AI 深度复盘</span>
-                  </div>
-                  <p className="text-base font-bold text-slate-600 leading-relaxed italic relative z-10">
-                    {shareCard.reflection}
-                  </p>
-                </div>
+                )}
   
-                <div className="flex items-end justify-between pt-8 border-t border-slate-100">
-                  <div className="space-y-6 flex-1">
-                    <div className="flex flex-wrap gap-2">
+                <div className="flex items-end justify-between pt-6 border-t border-slate-100">
+                  <div className="space-y-4 flex-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {shareCard.tags.map(t => (
-                        <span key={t} className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200/50">#{t}</span>
+                        <span key={t} className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200/50">#{t}</span>
                       ))}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                        <BrainCircuit size={22} />
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                        <BrainCircuit size={16} />
                       </div>
                       <div>
-                        <p className="text-sm font-black text-slate-900 leading-none mb-1">Read AI</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gamified Mastery</p>
+                        <p className="text-xs font-black text-slate-900 leading-none mb-0.5">Collector +</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Gamified Mastery</p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="text-center space-y-3 shrink-0">
-                    <div className="p-3 bg-white border-2 border-slate-50 rounded-[28px] shadow-sm ring-1 ring-slate-100">
+                  <div className="text-center space-y-2 shrink-0">
+                    <div className="p-2 bg-white border-2 border-slate-50 rounded-[20px] shadow-sm ring-1 ring-slate-100">
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://readai.app/share/${shareCard.id}&bgcolor=ffffff&color=4f46e5`} 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://readai.app/share/${shareCard.id}&bgcolor=ffffff&color=4f46e5`} 
                         alt="Article QR" 
-                        className="w-20 h-20"
+                        className="w-16 h-16"
                       />
                     </div>
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">扫码探索全文</p>
+                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">扫码探索全文</p>
                   </div>
                 </div>
               </div>

@@ -56,7 +56,7 @@ export const podcastApiClient = {
   // 生成播客
   generate: async (request: GeneratePodcastRequest) => {
     await delay(1000);
-    return PodcastAPI.generate(request);
+    return await PodcastAPI.generate(request);
   },
 
   // 设置

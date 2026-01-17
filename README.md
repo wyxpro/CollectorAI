@@ -549,23 +549,3 @@ Response: { success: boolean; settings: UserSettings }
 2. 确保使用最新版本的浏览器
 3. 检查viewport设置是否正确
 4. 查看控制台是否有错误信息
-
-
-
-## 📚 文档
-
-### 详细文档
-
-- [移动端适配指南](./MOBILE_ADAPTATION_COMPLETE.md)
-- [播客功能修复](./PODCAST_FIX_SUMMARY.md)
-- [AI问答适配](./AI_QUIZ_MOBILE_FIX.md)
-- [知识卡片适配](./KNOWLEDGE_BASE_MOBILE_FIX.md)
-- [深色模式实现](./DARK_MODE_IMPLEMENTATION.md)
-
-### API文档
-
-- [文章收录API](./api/libraryApi.ts)
-- [问答系统API](./api/quizApi.ts)
-- [播客系统API](./api/podcastApi.ts)
-- [用户系统API](./api/userApi.ts)
-

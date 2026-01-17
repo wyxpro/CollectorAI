@@ -2,64 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Play, Pause, SkipBack, SkipForward, Mic2, Settings2, Volume2, Gauge, Sparkles,
   Headphones, BookOpen, BrainCircuit, Wand2, Search, Heart, Trash2, Download,
-  Loader2, CheckCircle, X
+  Loader2, CheckCircle, X, AlertCircle
 } from 'lucide-react';
 import { KnowledgeCard } from '../types';
 import { usePodcasts, usePodcast, usePodcastSettings } from '../api/podcastHooks';
 import { GeneratePodcastRequest } from '../api/podcastApi';
-
-function parseDurationSeconds(input?: string): number {
-  if (!input) return 120;
-  const text = input.trim();
-  const mmss = text.match(/^(\d+):(\d{2})$/);
-  if (mmss) {
-    const m = Number(mmss[1]);
-    const s = Number(mmss[2]);
-    if (Number.isFinite(m) && Number.isFinite(s)) return m * 60 + s;
-  }
-  const n = Number(text);
-  return Number.isFinite(n) && n > 0 ? n : 120;
-}
-
-function createToneWavUrl(durationSec = 2.2, frequency = 440, sampleRate = 44100) {
-  const numberOfSamples = Math.max(1, Math.floor(durationSec * sampleRate));
-  const bytesPerSample = 2;
-  const dataSize = numberOfSamples * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-
-  const writeString = (offset: number, str: string) => {
-    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-  };
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * bytesPerSample, true);
-  view.setUint16(32, bytesPerSample, true);
-  view.setUint16(34, 16, true);
-  writeString(36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  const fadeSamples = Math.floor(sampleRate * 0.02);
-  const amp = 0.25;
-  for (let i = 0; i < numberOfSamples; i++) {
-    const t = i / sampleRate;
-    const raw = Math.sin(2 * Math.PI * frequency * t) * amp;
-    const fadeIn = fadeSamples > 0 ? Math.min(1, i / fadeSamples) : 1;
-    const fadeOut = fadeSamples > 0 ? Math.min(1, (numberOfSamples - 1 - i) / fadeSamples) : 1;
-    const fade = Math.min(fadeIn, fadeOut);
-    const sample = Math.max(-1, Math.min(1, raw * fade));
-    view.setInt16(44 + i * 2, Math.floor(sample * 32767), true);
-  }
-
-  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-}
+import { useAudioPlayer } from '../api/useAudioPlayer';
 
 const MOCK_CARDS: KnowledgeCard[] = [
   {
@@ -84,214 +32,16 @@ const PodcastView: React.FC = () => {
   const settingsHook = usePodcastSettings();
   const { settings, updateVoice, updateSpeed } = settingsHook;
   
+  // 使用增强的音频播放器
+  const audioPlayer = useAudioPlayer(activePodcast, settings?.speed || 1.0);
+  
   // UI状态
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState('');
-  
-  // 音频播放器引用
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [playbackMode, setPlaybackMode] = useState<'audio' | 'tone'>('audio');
-  const audioSourcesRef = React.useRef<string[]>([]);
-  const sourceIndexRef = React.useRef(0);
-  const fallbackWavUrlRef = React.useRef<string | null>(null);
-  const audioCtxRef = React.useRef<AudioContext | null>(null);
-  const oscRef = React.useRef<OscillatorNode | null>(null);
-  const gainRef = React.useRef<GainNode | null>(null);
-  const tickerRef = React.useRef<number | null>(null);
-  const toneStartMsRef = React.useRef(0);
-  const toneOffsetRef = React.useRef(0);
-  const toneDurationRef = React.useRef(0);
-
-  const stopTone = () => {
-    if (oscRef.current) {
-      try {
-        oscRef.current.stop();
-      } catch {}
-      oscRef.current.disconnect();
-      oscRef.current = null;
-    }
-    if (gainRef.current) {
-      try {
-        gainRef.current.disconnect();
-      } catch {}
-      gainRef.current = null;
-    }
-    if (tickerRef.current) {
-      window.clearInterval(tickerRef.current);
-      tickerRef.current = null;
-    }
-  };
-
-  const pauseTone = () => {
-    const elapsed = (performance.now() - toneStartMsRef.current) / 1000;
-    toneOffsetRef.current = Math.min(toneDurationRef.current || 0, toneOffsetRef.current + (Number.isFinite(elapsed) ? elapsed : 0));
-    stopTone();
-    setIsPlaying(false);
-    setCurrentTime(toneOffsetRef.current);
-    const d = toneDurationRef.current || 1;
-    setProgress((toneOffsetRef.current / d) * 100);
-  };
-
-  const startTone = (fromSeconds?: number) => {
-    const total = toneDurationRef.current || 120;
-    toneDurationRef.current = total;
-    setDuration(total);
-    setPlaybackMode('tone');
-
-    if (typeof fromSeconds === 'number') {
-      toneOffsetRef.current = Math.max(0, Math.min(fromSeconds, total));
-    }
-    toneStartMsRef.current = performance.now();
-
-    if (!audioCtxRef.current) {
-      const Ctx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined;
-      if (Ctx) audioCtxRef.current = new Ctx();
-    }
-
-    if (audioCtxRef.current) {
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume().catch(() => {});
-      }
-
-      const osc = audioCtxRef.current.createOscillator();
-      const gain = audioCtxRef.current.createGain();
-      gain.gain.value = 0.03;
-      osc.type = 'sine';
-      osc.frequency.value = 440;
-      osc.connect(gain);
-      gain.connect(audioCtxRef.current.destination);
-      osc.start();
-
-      oscRef.current = osc;
-      gainRef.current = gain;
-    }
-
-    setIsPlaying(true);
-    tickerRef.current = window.setInterval(() => {
-      const now = performance.now();
-      const t = toneOffsetRef.current + Math.max(0, (now - toneStartMsRef.current) / 1000);
-      const clamped = Math.min(total, t);
-      setCurrentTime(clamped);
-      setProgress((clamped / total) * 100);
-      if (clamped >= total) {
-        toneOffsetRef.current = 0;
-        stopTone();
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setProgress(0);
-      }
-    }, 120);
-  };
-
-  const fallbackToTone = (message = '网络音频不可用，已切换离线试听') => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setShowSuccess(message);
-    setTimeout(() => setShowSuccess(''), 2000);
-    startTone(toneOffsetRef.current || 0);
-  };
-
-  // 初始化音频播放器
-  useEffect(() => {
-    // 创建音频元素
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.crossOrigin = 'anonymous'; // 处理CORS
-      audioRef.current.preload = 'metadata'; // 预加载元数据
-      if (!fallbackWavUrlRef.current) fallbackWavUrlRef.current = createToneWavUrl();
-      
-      // 监听播放进度
-      audioRef.current.addEventListener('timeupdate', () => {
-        if (audioRef.current) {
-          setCurrentTime(audioRef.current.currentTime);
-          const progress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
-          setProgress(progress || 0);
-        }
-      });
-      
-      // 监听音频加载完成
-      audioRef.current.addEventListener('loadedmetadata', () => {
-        if (audioRef.current) {
-          setDuration(audioRef.current.duration);
-          console.log('音频加载完成，时长:', audioRef.current.duration);
-        }
-      });
-      
-      // 监听播放事件
-      audioRef.current.addEventListener('play', () => {
-        console.log('音频开始播放');
-        setIsPlaying(true);
-      });
-      
-      // 监听暂停事件
-      audioRef.current.addEventListener('pause', () => {
-        console.log('音频已暂停');
-        setIsPlaying(false);
-      });
-      
-      // 监听播放结束
-      audioRef.current.addEventListener('ended', () => {
-        console.log('音频播放结束');
-        setIsPlaying(false);
-        setProgress(0);
-      });
-      
-      // 监听错误：自动切换备用音源，最终切换离线试听
-      audioRef.current.addEventListener('error', (e) => {
-        console.error('音频加载错误:', e);
-        const nextIndex = sourceIndexRef.current + 1;
-        if (audioRef.current && nextIndex < audioSourcesRef.current.length) {
-          sourceIndexRef.current = nextIndex;
-          audioRef.current.src = audioSourcesRef.current[sourceIndexRef.current];
-          audioRef.current.load();
-          return;
-        }
-        fallbackToTone();
-      });
-      
-      // 监听加载中
-      audioRef.current.addEventListener('loadstart', () => {
-        console.log('开始加载音频...');
-      });
-      
-      // 监听可以播放
-      audioRef.current.addEventListener('canplay', () => {
-        console.log('音频可以播放');
-      });
-    }
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
-      }
-      stopTone();
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close().catch(() => {});
-        audioCtxRef.current = null;
-      }
-      if (fallbackWavUrlRef.current) {
-        URL.revokeObjectURL(fallbackWavUrlRef.current);
-        fallbackWavUrlRef.current = null;
-      }
-    };
-  }, []);
-
-  // 自动选择第一个播客
-  useEffect(() => {
-    if (!selectedPodcastId && podcasts.length > 0) {
-      setSelectedPodcastId(podcasts[0].id);
-    }
-  }, [podcasts, selectedPodcastId]);
+  const [showError, setShowError] = useState('');
 
   // 搜索处理
   useEffect(() => {
@@ -304,42 +54,13 @@ const PodcastView: React.FC = () => {
     }
   }, [searchQuery, showFavoritesOnly]);
 
-  // 更新播放速度
+  // 显示错误信息
   useEffect(() => {
-    if (audioRef.current && settings) {
-      audioRef.current.playbackRate = settings.speed;
+    if (audioPlayer.error) {
+      setShowError(audioPlayer.error);
+      setTimeout(() => setShowError(''), 3000);
     }
-  }, [settings?.speed]);
-  
-  // 加载音频文件
-  useEffect(() => {
-    if (activePodcast && audioRef.current) {
-      toneDurationRef.current = parseDurationSeconds(activePodcast.duration);
-      toneOffsetRef.current = 0;
-
-      // 停止当前播放
-      audioRef.current.pause();
-      setIsPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
-      setPlaybackMode('audio');
-      
-      // 使用多个备用音频源
-      audioSourcesRef.current = [
-        fallbackWavUrlRef.current || '',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        'https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3',
-        'https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lepidoptera.ogg'
-      ].filter(Boolean);
-      sourceIndexRef.current = 0;
-      
-      // 尝试加载第一个音频源
-      audioRef.current.src = audioSourcesRef.current[sourceIndexRef.current];
-      audioRef.current.load();
-      
-      console.log('加载播客音频:', activePodcast.title);
-    }
-  }, [activePodcast]);
+  }, [audioPlayer.error]);
 
   // 播放控制
   const handlePlayPause = async () => {
@@ -350,145 +71,38 @@ const PodcastView: React.FC = () => {
     }
     
     try {
-      if (playbackMode === 'tone') {
-        if (isPlaying) {
-          pauseTone();
-        } else {
-          startTone(toneOffsetRef.current);
-        }
-        return;
-      }
-
-      if (!audioRef.current) {
-        fallbackToTone();
-        return;
-      }
-
-      if (isPlaying) {
-        // 暂停播放
-        audioRef.current.pause();
-        console.log('暂停播放');
-      } else {
-        // 开始播放
-        console.log('尝试播放音频...');
-        console.log('音频源:', audioRef.current.src);
-        console.log('音频就绪状态:', audioRef.current.readyState);
-        
-        // 确保音频已加载
-        if (audioRef.current.readyState < 2) {
-          console.log('音频未就绪，等待加载...');
-          setShowSuccess('正在加载音频...');
-          await new Promise((resolve) => {
-            let done = false;
-            const finish = () => {
-              if (done) return;
-              done = true;
-              audioRef.current?.removeEventListener('canplay', onCanPlay);
-              audioRef.current?.removeEventListener('error', onError);
-              resolve(true);
-            };
-            const onCanPlay = () => finish();
-            const onError = () => finish();
-            audioRef.current?.addEventListener('canplay', onCanPlay);
-            audioRef.current?.addEventListener('error', onError);
-            setTimeout(() => finish(), 3500);
-            audioRef.current?.load();
-          });
-          setShowSuccess('');
-        }
-        
-        // 播放音频
-        await audioRef.current.play();
-        console.log('播放成功');
-        
-        // 首次播放时增加播放计数
-        if (progress === 0 || currentTime === 0) {
-          incrementPlayCount();
-        }
+      await audioPlayer.togglePlayPause();
+      
+      // 首次播放时增加播放计数
+      if (!audioPlayer.isPlaying && audioPlayer.currentTime === 0) {
+        incrementPlayCount();
       }
     } catch (error: any) {
       console.error('播放失败:', error);
-      
-      // 详细的错误处理
-      let errorMessage = '播放失败';
-      if (error.name === 'NotAllowedError') {
-        errorMessage = '浏览器阻止了自动播放，请点击播放按钮';
-      } else if (error.name === 'NotSupportedError') {
-        errorMessage = '音频格式不支持';
-      } else if (error.name === 'AbortError') {
-        errorMessage = '音频加载被中断';
-      } else {
-        errorMessage = `播放失败: ${error.message}`;
-      }
-      
-      if (error?.name === 'NotAllowedError') {
-        setShowSuccess(errorMessage);
-        setTimeout(() => setShowSuccess(''), 3000);
-        setIsPlaying(false);
-        return;
-      }
-
-      fallbackToTone(errorMessage.includes('音频格式') ? '音频格式不支持，已切换离线试听' : '网络音频不可用，已切换离线试听');
+      setShowError(error.message || '播放失败');
+      setTimeout(() => setShowError(''), 3000);
     }
   };
   
   // 快进/快退
   const handleSkipForward = () => {
-    if (playbackMode === 'tone') {
-      const total = toneDurationRef.current || 120;
-      const next = Math.min((isPlaying ? toneOffsetRef.current + (performance.now() - toneStartMsRef.current) / 1000 : toneOffsetRef.current) + 10, total);
-      toneOffsetRef.current = next;
-      toneStartMsRef.current = performance.now();
-      setCurrentTime(next);
-      setProgress((next / total) * 100);
-      return;
-    }
-    if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 10, audioRef.current.duration);
+    audioPlayer.skipForward(10);
   };
   
   const handleSkipBackward = () => {
-    if (playbackMode === 'tone') {
-      const total = toneDurationRef.current || 120;
-      const next = Math.max((isPlaying ? toneOffsetRef.current + (performance.now() - toneStartMsRef.current) / 1000 : toneOffsetRef.current) - 10, 0);
-      toneOffsetRef.current = next;
-      toneStartMsRef.current = performance.now();
-      setCurrentTime(next);
-      setProgress((next / total) * 100);
-      return;
-    }
-    if (audioRef.current) audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 10, 0);
+    audioPlayer.skipBackward(10);
   };
   
   // 进度条点击
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
-    if (playbackMode === 'tone') {
-      const total = toneDurationRef.current || duration || 120;
-      const targetTime = Math.max(0, Math.min(percent, 1)) * total;
-      toneOffsetRef.current = targetTime;
-      toneStartMsRef.current = performance.now();
-      setCurrentTime(targetTime);
-      setProgress((targetTime / total) * 100);
-      return;
-    }
-    if (!audioRef.current) return;
-    const targetTime = Math.max(0, Math.min(percent, 1)) * (audioRef.current.duration || 0);
-    audioRef.current.currentTime = targetTime;
-    setCurrentTime(targetTime);
-    const nextProgress = (audioRef.current.duration ? (targetTime / audioRef.current.duration) * 100 : 0);
-    setProgress(nextProgress);
+    const targetTime = Math.max(0, Math.min(percent, 1)) * audioPlayer.duration;
+    audioPlayer.seek(targetTime);
   };
 
   const handleSelectPodcast = (id: string) => {
     setSelectedPodcastId(id);
-    setProgress(0);
-    toneOffsetRef.current = 0;
-    stopTone();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -531,10 +145,18 @@ const PodcastView: React.FC = () => {
   };
 
   const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds)) return '0:00';
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' + s : s}`;
   };
+
+  // 自动选择第一个播客
+  useEffect(() => {
+    if (!selectedPodcastId && podcasts.length > 0) {
+      setSelectedPodcastId(podcasts[0].id);
+    }
+  }, [podcasts, selectedPodcastId]);
 
   if (!settings) {
     return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={40} /></div>;
@@ -546,6 +168,13 @@ const PodcastView: React.FC = () => {
       {showSuccess && (
         <div className="fixed top-4 right-4 left-4 sm:left-auto bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 z-50 animate-in slide-in-from-top-2">
           <CheckCircle size={16} /> {showSuccess}
+        </div>
+      )}
+
+      {/* Error Toast */}
+      {showError && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto bg-red-500 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 z-50 animate-in slide-in-from-top-2">
+          <AlertCircle size={16} /> {showError}
         </div>
       )}
 
@@ -748,19 +377,26 @@ const PodcastView: React.FC = () => {
                 {/* Waveform */}
                 <div className="bg-gradient-to-r from-rose-500 to-indigo-600 h-24 sm:h-32 rounded-2xl sm:rounded-3xl shadow-lg flex items-center justify-center relative overflow-hidden">
                    <div className="absolute inset-0 bg-black/10"></div>
-                   <div className="flex items-center gap-1 h-12">
-                     {[...Array(20)].map((_, i) => (
-                       <div 
-                          key={i} 
-                          className="w-1.5 bg-white/80 rounded-full animate-pulse" 
-                          style={{ 
-                            height: isPlaying ? `${Math.random() * 100}%` : '20%',
-                            animationDuration: `${0.5 + Math.random()}s`,
-                            animationPlayState: isPlaying ? 'running' : 'paused'
-                          }} 
-                       />
-                     ))}
-                   </div>
+                   {audioPlayer.isLoading ? (
+                     <div className="flex items-center gap-2 text-white">
+                       <Loader2 className="animate-spin" size={24} />
+                       <span className="text-sm font-medium">正在生成音频...</span>
+                     </div>
+                   ) : (
+                     <div className="flex items-center gap-1 h-12">
+                       {[...Array(20)].map((_, i) => (
+                         <div 
+                            key={i} 
+                            className="w-1.5 bg-white/80 rounded-full animate-pulse" 
+                            style={{ 
+                              height: audioPlayer.isPlaying ? `${Math.random() * 100}%` : '20%',
+                              animationDuration: `${0.5 + Math.random()}s`,
+                              animationPlayState: audioPlayer.isPlaying ? 'running' : 'paused'
+                            }} 
+                         />
+                       ))}
+                     </div>
+                   )}
                 </div>
 
                 {/* Summary */}
@@ -828,32 +464,41 @@ const PodcastView: React.FC = () => {
                        onClick={handleSkipBackward}
                        className="text-slate-400 hover:text-indigo-600 transition-colors min-w-touch min-h-touch flex items-center justify-center"
                        title="后退10秒"
+                       disabled={audioPlayer.isLoading}
                      >
                        <SkipBack size={18} className="sm:w-5 sm:h-5" />
                      </button>
                      <button 
                        onClick={handlePlayPause}
-                       className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95"
+                       disabled={audioPlayer.isLoading}
+                       className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                      >
-                       {isPlaying ? <Pause size={20} className="sm:w-6 sm:h-6" fill="currentColor" /> : <Play size={20} className="sm:w-6 sm:h-6 ml-0.5" fill="currentColor" />}
+                       {audioPlayer.isLoading ? (
+                         <Loader2 size={20} className="sm:w-6 sm:h-6 animate-spin" />
+                       ) : audioPlayer.isPlaying ? (
+                         <Pause size={20} className="sm:w-6 sm:h-6" fill="currentColor" />
+                       ) : (
+                         <Play size={20} className="sm:w-6 sm:h-6 ml-0.5" fill="currentColor" />
+                       )}
                      </button>
                      <button 
                        onClick={handleSkipForward}
                        className="text-slate-400 hover:text-indigo-600 transition-colors min-w-touch min-h-touch flex items-center justify-center"
                        title="前进10秒"
+                       disabled={audioPlayer.isLoading}
                      >
                        <SkipForward size={18} className="sm:w-5 sm:h-5" />
                      </button>
                   </div>
                   <div className="w-full flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-slate-400 font-medium font-mono">
-                     <span>{formatTime(currentTime)}</span>
+                     <span>{formatTime(audioPlayer.currentTime)}</span>
                      <div 
                        className="flex-1 h-1 sm:h-1.5 bg-slate-100 rounded-full overflow-hidden cursor-pointer"
                        onClick={handleProgressClick}
                      >
-                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-100" style={{ width: `${progress}%` }}></div>
+                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-100" style={{ width: `${audioPlayer.progress}%` }}></div>
                      </div>
-                     <span>{formatTime(duration)}</span>
+                     <span>{formatTime(audioPlayer.duration)}</span>
                   </div>
                </div>
 

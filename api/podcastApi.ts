@@ -133,7 +133,7 @@ class PodcastDatabase {
   }
 
   // 生成新播客
-  generatePodcast(request: GeneratePodcastRequest): { podcastId: string; estimatedTime: number; status: string } {
+  async generatePodcast(request: GeneratePodcastRequest): Promise<{ podcastId: string; estimatedTime: number; status: string; audioUrl?: string }> {
     const newPodcast: Podcast = {
       id: `podcast_${Date.now()}`,
       title: request.content ? `${request.content.substring(0, 30)}...的深度解析` : '新生成的播客',
@@ -153,27 +153,74 @@ class PodcastDatabase {
 
     this.podcasts.unshift(newPodcast);
 
-    // 模拟生成过程
-    setTimeout(() => {
+    // 异步生成播客内容和音频
+    this.generatePodcastContent(newPodcast.id, request).catch(error => {
+      console.error('播客生成失败:', error);
       const podcast = this.podcasts.find(p => p.id === newPodcast.id);
       if (podcast) {
-        podcast.status = 'ready';
-        podcast.summary = '基于您的内容生成的AI播客，深入浅出地解析核心观点。';
-        podcast.script = [
-          { role: 'host', text: '欢迎来到 Collector +，今天我们来聊聊这个有趣的话题。', timestamp: 0 },
-          { role: 'ai', text: '让我们从核心概念开始，逐步深入探讨。', timestamp: 8 },
-          { role: 'host', text: '这个观点确实很有启发性，值得我们深入思考。', timestamp: 18 },
-          { role: 'ai', text: '总结一下，关键在于理解背后的原理并应用到实践中。', timestamp: 28 }
-        ];
-        podcast.audioUrl = `/audio/${newPodcast.id}.mp3`;
+        podcast.status = 'failed';
       }
-    }, 3000);
+    });
 
     return {
       podcastId: newPodcast.id,
       estimatedTime: 3,
       status: 'processing'
     };
+  }
+
+  // 生成播客内容（异步）
+  private async generatePodcastContent(podcastId: string, request: GeneratePodcastRequest): Promise<void> {
+    // 模拟AI生成脚本
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const podcast = this.podcasts.find(p => p.id === podcastId);
+    if (!podcast) return;
+
+    // 根据风格生成不同的脚本
+    let script: PodcastScript[] = [];
+    const content = request.content || '人工智能正在改变我们的生活方式';
+
+    switch (request.style) {
+      case 'educational':
+        script = [
+          { role: 'host', text: `欢迎来到 Collector + AI播客。今天我们要深入探讨：${content}`, timestamp: 0 },
+          { role: 'ai', text: '让我们从基础概念开始，逐步深入理解这个话题的核心要点。', timestamp: 8 },
+          { role: 'host', text: '这个观点确实很有启发性，它揭示了问题的本质。', timestamp: 18 },
+          { role: 'ai', text: '通过实际案例，我们可以更好地理解这些理论如何应用到实践中。', timestamp: 28 },
+          { role: 'host', text: '总结一下，关键在于理解背后的原理，并将其应用到日常工作中。', timestamp: 40 }
+        ];
+        break;
+      case 'conversational':
+        script = [
+          { role: 'host', text: `嘿，今天聊点有意思的：${content}`, timestamp: 0 },
+          { role: 'ai', text: '哈哈，这个话题确实很有趣！让我分享一些我的看法。', timestamp: 6 },
+          { role: 'host', text: '对对对，我也是这么想的！你觉得这会对我们产生什么影响？', timestamp: 14 },
+          { role: 'ai', text: '影响可大了！简单来说，它会改变我们思考和工作的方式。', timestamp: 22 },
+          { role: 'host', text: '说得太对了！听完这期播客，相信大家都有新的启发。', timestamp: 32 }
+        ];
+        break;
+      case 'storytelling':
+        script = [
+          { role: 'host', text: `让我给你讲个故事，关于${content}的故事。`, timestamp: 0 },
+          { role: 'ai', text: '故事要从很久以前说起，那时候人们还没有意识到这个问题的重要性。', timestamp: 8 },
+          { role: 'host', text: '直到有一天，一切都改变了。人们开始重新思考这个问题。', timestamp: 18 },
+          { role: 'ai', text: '这个转变带来了深远的影响，改变了整个行业的发展方向。', timestamp: 28 },
+          { role: 'host', text: '故事还在继续，而我们每个人都是这个故事的一部分。', timestamp: 38 }
+        ];
+        break;
+    }
+
+    // 更新播客信息
+    podcast.script = script;
+    podcast.summary = `基于您的内容生成的${request.style === 'educational' ? '教育讲解' : request.style === 'conversational' ? '对话交流' : '故事叙述'}风格播客，深入浅出地解析核心观点。`;
+    
+    // 生成音频URL（使用audioService）
+    // 注意：这里使用标记来表示音频已生成，实际URL会在前端通过audioService生成
+    podcast.audioUrl = `generated://${podcastId}`;
+    podcast.status = 'ready';
+
+    console.log('播客生成完成:', podcastId);
   }
 
   // 删除播客

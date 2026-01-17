@@ -1,4 +1,4 @@
-# 📚 Collector + - 智能阅读助手
+# 📚 Collector AI-智能阅读助手
 
 <div align="center">
 

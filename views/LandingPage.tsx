@@ -555,7 +555,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
 
             <div className="flex flex-col sm:flex-row items-center gap-5">
               <InteractiveButton onClick={onStart} icon={ArrowRight}>
-                立即领衔创作
+                立即体验
               </InteractiveButton>
               <InteractiveButton variant="secondary" onClick={() => setIsModalOpen(true)}>
                 申请加入
@@ -771,7 +771,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
           </div>
           
           <div className="mt-24 pt-12 border-t border-slate-50 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="text-slate-400 font-bold text-sm">© 2024 Collector +. All rights reserved.</div>
+            <div className="text-slate-400 font-bold text-sm">© 2026 Collector +. All rights reserved.</div>
             <div className="flex gap-10 text-slate-300">
               <a href="#" className="hover:text-indigo-600 transition-colors" aria-label="Globe"><Globe size={22} /></a>
               <a href="#" className="hover:text-indigo-600 transition-colors" aria-label="Activity"><Activity size={22} /></a>

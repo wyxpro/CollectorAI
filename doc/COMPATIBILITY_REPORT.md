@@ -1,4 +1,4 @@
-# Collector + · 智阅计划 响应式测试与浏览器兼容性报告
+# CollectorAI · 智阅计划 响应式测试与浏览器兼容性报告
 
 ## 1. 响应式测试报告 (Responsive Test Report)
 

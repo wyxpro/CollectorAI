@@ -1,4 +1,4 @@
-# Collector + · 智阅计划 设计规范文档
+# CollectorAI · 智阅计划 设计规范文档
 
 ## 1. 视觉识别系统 (Visual Identity)
 
